@@ -1,6 +1,16 @@
 """
 Build graphs from binaries. Makes use of the angr (docs.angr.io) binary analysis toolkit. Looks like a useful tool but there is a lot 
 about it I still don't understand.
+Test it out with the test binaries. Two of them are windows drivers and the other one is from the C++ class.
+To get this to run I did:
+
+conda create --n angr python=3
+conda activate angr
+pip install angr
+conda install numpy
+conda install scipy (think networkx needs this to draw the graph)
+conda install matplotlib
+
 - Alex
 """
 
@@ -55,9 +65,9 @@ def get_graph(bin_fileloc, force_complete_scan=False, plot=False):
 
 
 def main():
-    # A, X = get_graph('binaries/B411BC77CC5097E765D9DC9E215F56797347EAD23A6613EA90A9BE296E83E42E00.blob')
-    # A, X = get_graph('binaries/5E098569FBCA0228E83966E8A74F0EC0E3BF69EAC8228D1EB122A44D68A0A0A800.blob')
-    A, X = get_graph('binaries/hi.cpp.o')
+    # A, X = get_graph('test_benign_binaries/B411BC77CC5097E765D9DC9E215F56797347EAD23A6613EA90A9BE296E83E42E00.blob')
+    A, X = get_graph('test_benign_binaries/5E098569FBCA0228E83966E8A74F0EC0E3BF69EAC8228D1EB122A44D68A0A0A800.blob')
+    # A, X = get_graph('test_benign_binaries/hi.cpp.o')
 
     plt.imshow(A)
     plt.colorbar()
