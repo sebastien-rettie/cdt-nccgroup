@@ -34,7 +34,7 @@ def get_graph(bin_fileloc, force_complete_scan=False, plot=False):
     # cfg.normalize()
     G = cfg.graph
 
-    A = nx.to_numpy_array(G, dtype=np.bool)
+    A = nx.to_numpy_array(G, dtype=bool)
     X = np.zeros((len(G.nodes()), 4), dtype=np.int8)
 
     if plot:
@@ -65,8 +65,8 @@ def get_graph(bin_fileloc, force_complete_scan=False, plot=False):
 
 
 def main():
-    # A, X = get_graph('test_benign_binaries/B411BC77CC5097E765D9DC9E215F56797347EAD23A6613EA90A9BE296E83E42E00.blob')
-    A, X = get_graph('test_benign_binaries/5E098569FBCA0228E83966E8A74F0EC0E3BF69EAC8228D1EB122A44D68A0A0A800.blob')
+    A, X = get_graph('test_benign_binaries/B411BC77CC5097E765D9DC9E215F56797347EAD23A6613EA90A9BE296E83E42E00.blob')
+    # A, X = get_graph('test_benign_binaries/5E098569FBCA0228E83966E8A74F0EC0E3BF69EAC8228D1EB122A44D68A0A0A800.blob')
     # A, X = get_graph('test_benign_binaries/hi.cpp.o')
 
     plt.imshow(A)
