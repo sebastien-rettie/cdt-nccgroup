@@ -1,0 +1,39 @@
+name: ncc_crawler
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - beautifulsoup4=4.9.3=pyha847dfd_0
+  - brotlipy=0.7.0=py39h2bbff1b_1003
+  - bs4=4.9.3=hd3eb1b0_0
+  - ca-certificates=2020.12.5=h5b45459_0
+  - certifi=2020.12.5=py39hcbf5309_1
+  - cffi=1.14.4=py39hcd4344a_0
+  - chardet=4.0.0=py39haa95532_1003
+  - cryptography=3.3.1=py39hcd4344a_0
+  - html5lib=1.1=py_0
+  - idna=2.10=pyhd3eb1b0_0
+  - openssl=1.1.1i=h8ffe710_0
+  - pip=20.3.3=py39haa95532_0
+  - pycparser=2.20=py_2
+  - pyopenssl=20.0.1=pyhd3eb1b0_1
+  - pysocks=1.7.1=py39haa95532_0
+  - python=3.9.1=h6244533_2
+  - python_abi=3.9=1_cp39
+  - requests=2.25.1=pyhd3eb1b0_0
+  - selenium=3.141.0=py39hb82d6ee_1002
+  - setuptools=52.0.0=py39haa95532_0
+  - six=1.15.0=pyhd3eb1b0_0
+  - soupsieve=2.1=pyhd3eb1b0_0
+  - sqlite=3.33.0=h2a8f88b_0
+  - tzdata=2020f=h52ac0ba_0
+  - urllib3=1.26.3=pyhd3eb1b0_0
+  - vc=14.2=h21ff451_1
+  - vs2015_runtime=14.27.29016=h5e58377_2
+  - webencodings=0.5.1=py39haa95532_1
+  - wheel=0.36.2=pyhd3eb1b0_0
+  - win_inet_pton=1.1.0=py39haa95532_0
+  - wincertstore=0.2=py39h2bbff1b_0
+  - zlib=1.2.11=h62dcd97_4
+prefix: C:\Users\Emily\Anaconda3\envs\ncc_crawler
+
