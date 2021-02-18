@@ -1,0 +1,208 @@
+arithmetic:
+
+  - add
+  - adc
+  - sub
+  - sbb
+  - neg
+  - inc
+  - dec
+  - mul
+  - imul
+  - div
+  - idiv
+  - aaa
+  - aad
+  - aam
+  - aas
+  - daa
+  - das
+  - xadd
+  - mulss
+  - addss
+  - subss
+  - fadd
+  - mulsd
+  - divsd
+  - addsd
+  - divss
+  - subsd
+
+bit_manipulation:
+
+  - rcl
+  - rcr
+  - rol
+  - ror
+  - sal
+  - sar
+  - shr
+  - shl
+  - bt
+  - bts
+  - btr
+
+control_flow:
+
+  - jmp
+  - ja
+  - jae
+  - jb
+  - jbe
+  - jc
+  - je
+  - jg
+  - jge
+  - jl
+  - jle
+  - jna
+  - jnae
+  - jnb
+  - jnbe
+  - jnc
+  - jne
+  - jng
+  - jnge
+  - jnl
+  - jnle
+  - jno
+  - jnp
+  - jns
+  - jnz
+  - jo
+  - jp
+  - jpe
+  - jpo
+  - js
+  - jz
+  - call
+  - ret
+  - jcxz
+  - loop
+  - loopx
+  - rep
+  - repe
+  - repne
+  - repnz
+  - repz
+  - retn
+  - retf
+  - loopne
+  - movntdq
+
+data_manipulation:
+
+  - lea
+  - mov
+  - movsx
+  - movzx
+  - push
+  - pop
+  - pushad
+  - popad
+  - enter
+  - leave
+  - cbw
+  - cwd
+  - cwde
+  - cdq
+  - esc
+  - lds
+  - les
+  - lodsb
+  - lodsw
+  - movsb
+  - movsw
+  - xchg
+  - xlat
+  - movups
+  - movsxd
+  - movabs
+  - movaps
+  - cmovne
+  - movdqu
+  - cmove
+  - movdqa
+  - movsd
+  - popal
+  - cmovle
+  - cmpxchg
+  - movss
+  - cmovb
+  - cmova
+  - cmovae
+  - cmovns
+  - cdqec
+  - cmovbe
+  - stosb
+  - stosw
+  - pushal
+  - bswap
+  - movd
+  - movntt
+  - cmovo
+  - movq
+  - cmovl
+  - cmovge
+  - stosd
+  - cvtsi2sd
+  - psrldq
+  - prefetchnta
+  - cqo
+  - cvttsd2si
+  - movntps
+  - cmo5
+  - prefetchw
+
+flags:
+
+  - clc
+  - cld
+  - cli
+  - cmc
+  - lahe
+  - popf
+  - pushfd
+  - popfd
+  - pushf
+  - sahf
+  - stc
+  - std
+  - sti
+  - lahf
+  - pushfq
+
+logical:
+
+  - and
+  - or
+  - xor
+  - not
+  - test
+  - cmp
+  - cmpsb
+  - cmpsw
+  - xorps
+  - setne
+  - sete
+  - scasb
+  - comiss
+  - comisd
+  - setae
+  - seta
+  - setb
+
+system:
+
+  - in
+  - out
+  - hlt
+  - int
+  - into
+  - iret
+  - lock
+  - wait
+  - nop
+  - int3
+  - lfence
+  - bnd
