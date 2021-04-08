@@ -1,11 +1,8 @@
-# Extract characteristics from PE files using 'pefile' into raw features
-
+# Extract characteristics from PE files into raw features
 # Must place in benign/malign folder
-# Written and tested on windows- convert to unix
 # Assumes no duplicate files
 
 # Can expand to include function imports
-# Could be parallelised
 
 import pefile
 import sys, os
@@ -34,7 +31,7 @@ for folder, subfolder, files in os.walk(dir_path):
             file_list.append(full_path)
 print("file list=", file_list)
 
-# Could chop file list into batches/parallise here
+# todo: split file list into batches to parallise
 
 
 def extract_header(HEADER):
@@ -46,28 +43,17 @@ def extract_header(HEADER):
         if "Structure" in str(item):
             continue
         item_list.append(item)
-        """
-        try:
-            value = header_dict[item]['Value'].decode('utf-8')
-            var_list.append(value)
-        except ValueError:
-            var_list.append(header_dict[item]['Value'])
-        except AttributeError:
-            var_list.append(header_dict[item]['Value'])
-        """
         var_list.append(header_dict[item]["Value"])
     header_dict = dict(zip(item_list, var_list))
     return header_dict
 
 
-exe_no = 0
-
 # Iterate over executables in folder
 for executable in file_list:
     print(executable)
     pe = pefile.PE(executable, fast_load=True)
-    # Parse all of NT_HEADER, FILE_HEADER, OPTIONAL_HEADER AND DOS_HEADER
 
+    # Parse section headers, num of sections, ordering and other attributes
     header_dict = {}
 
     if pe.OPTIONAL_HEADER:
@@ -79,21 +65,17 @@ for executable in file_list:
     if pe.FILE_HEADER:
         header_dict.update(extract_header(pe.FILE_HEADER))
 
-    # Flags var could cause trouble here
+    # todo: flags variable could cause trouble, add error catching
 
     if pe.DOS_HEADER:
         header_dict.update(extract_header(pe.DOS_HEADER))
 
-    # Parse section headers, structure, numb of sections, ordering,  name and other attributes
-
-    # section_number = len(pe.sections)
     sect_no = 0
 
     item_list = []
     var_list = []
 
     for section in pe.sections:
-        # print('Section number ',sect_no)
         section = section.dump_dict()
         for item in section:
             if "Structure" in str(item):
@@ -101,30 +83,21 @@ for executable in file_list:
             item_numbered = item + str(sect_no)
             item_list.append(item_numbered)
             var_list.append(section[item]["Value"])
-            # print(section[item]['Value'])
-        # print(section)
         """
-        # not sure if should try and deal with encodings or not
-        print(section.Name), print(section.Name.decode('utf-8')),
-        print (section.Name, hex(section.VirtualAddress),
-        hex(section.Misc_VirtualSize), section.SizeOfRawData )
+        If decoding does not happen automatically, use section.Name.decode('utf-8')
         """
 
         sect_no += 1
 
     section_dict = dict(zip(item_list, var_list))
     header_dict.update(section_dict)
-    # print(header_dict)
+
     # Write to list of dataframes
     df = pd.DataFrame.from_dict(header_dict, orient="index")
-
     dataframe_list.append(df.T)
 
-    exe_no += 1
 
-# pe =  pefile.PE(r'C:\Users\Emily\Documents\ncc_group_project\malware-fake\OfficeSetup.exe', fast_load=True)
-
-# Add import analysis here
+# todo: add extraction of imports
 
 
 final_df = pd.concat(dataframe_list)
@@ -132,9 +105,7 @@ final_df.fillna(0, inplace=True)
 
 if malware == True:
     final_df["IsMalware"] = 1
+    final_df.to_csv("processed_malware.csv", index=False)
 elif malware == False:
     final_df["IsMalware"] = 0
-
-final_df.to_csv("test.csv", index=False)
-
-# print(pe.dump_info())
+    final_df.to_csv("processed_benign.csv", index=False)
