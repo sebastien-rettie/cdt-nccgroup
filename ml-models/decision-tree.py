@@ -1,21 +1,81 @@
 import numpy as np
 import pandas as pd
+import graphviz
+import pydot
+import matplotlib.pyplot as plt
 
 from sklearn.preprocessing import MaxAbsScaler
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.compose import ColumnTransformer
+from sklearn.model_selection import validation_curve
 from sklearn.model_selection import train_test_split
+
+from sklearn.model_selection import StratifiedShuffleSplit
+from sklearn.model_selection import KFold, StratifiedKFold
+
 from sklearn.pipeline import Pipeline
 from sklearn.compose import make_column_selector as selector
+from sklearn.metrics import classification_report
+from sklearn.tree import export_text
+from sklearn.metrics import plot_confusion_matrix
+from sklearn.metrics import roc_auc_score, roc_curve, auc
+from sklearn.feature_selection._base import SelectorMixin
+from sklearn.feature_extraction.text import _VectorizerMixin
 
-from sklearn.tree import DecisionTreeClassifier
+from sklearn.tree import DecisionTreeClassifier, export_graphviz
+
+from sklearn.model_selection import RandomizedSearchCV
+
+from sklearn.model_selection import cross_val_score
+
+# from joblib import parallel_backend
+# todo: implement parallelism
+
 
 input_file = "benign/benign-dll.csv"
 input_file_2 = "benign/benign-exe.csv"
 input_file_3 = "malware/00355_malware.csv"
 input_file_4 = "malware/00372_malware.csv"
+input_file_5 = "malware/00373_malware.csv"
+
+# Some black magic to retrieve feature names from the encoder
+def get_feature_out(estimator, feature_in):
+    if hasattr(estimator, "get_feature_names"):
+        if isinstance(estimator, _VectorizerMixin):
+            # handling all vectorizers
+            return [f"vec_{f}" for f in estimator.get_feature_names()]
+        else:
+            return estimator.get_feature_names(feature_in)
+    elif isinstance(estimator, SelectorMixin):
+        return np.array(feature_in)[estimator.get_support()]
+    else:
+        return feature_in
 
 
+def get_ct_feature_names(ct):
+    # handles all estimators, pipelines inside ColumnTransfomer
+    # doesn't work when remainder =='passthrough'
+    # which requires the input column names.
+    output_features = []
+
+    for name, estimator, features in ct.transformers_:
+        if name != "remainder":
+            if isinstance(estimator, Pipeline):
+                current_features = features
+                for step in estimator:
+                    current_features = get_feature_out(step, current_features)
+                features_out = current_features
+            else:
+                features_out = get_feature_out(estimator, features)
+            output_features.extend(features_out)
+        elif estimator == "passthrough":
+            output_features.extend(ct._feature_names_in[features])
+
+    return output_features
+
+
+# Function to read certain columns as objects not floats.
+# Reduces overhead of pandas trying to decide for itself.
 def generate_types(datafile):
     col_names = pd.read_csv(input_file, nrows=0).columns
     dtypes = {col: "float64" for col in col_names}
@@ -51,93 +111,372 @@ def generate_types(datafile):
     ]
     for column in string_columns:
         dtypes.update({column: "object"})
-    # print(dtypes)
     return dtypes
 
+
+# Utility function to report best scores
+def report(results, n_top=3):
+    for i in range(1, n_top + 1):
+        candidates = np.flatnonzero(results["rank_test_score"] == i)
+        for candidate in candidates:
+            print("Model with rank: {0}".format(i))
+            print(
+                "Mean validation score: {0:.3f} (std: {1:.3f})".format(
+                    results["mean_test_score"][candidate],
+                    results["std_test_score"][candidate],
+                )
+            )
+            print("Parameters: {0}".format(results["params"][candidate]))
+            print("")
+
+
+np.set_printoptions(precision=2)
 
 df1 = pd.read_csv(input_file, dtype=generate_types(input_file))
 df2 = pd.read_csv(input_file_2, dtype=generate_types(input_file_2))
 df3 = pd.read_csv(input_file_3, dtype=generate_types(input_file_3))
 df4 = pd.read_csv(input_file_4, dtype=generate_types(input_file_4))
+df5 = pd.read_csv(input_file_5, dtype=generate_types(input_file_4))
 
+all_data = pd.concat([df1, df2, df3, df4, df5], axis=0)
 
-# print(df1.shape)
-# print(df1.dtypes)
-
-# print(df2.shape)
-# print(df2.dtypes)
-
-all_data = pd.concat([df1, df2, df3, df4], axis=0)
-# all_data.select_dtypes(include="object").fillna("0", inplace=True)
-# all_data.select_dtypes(include="number").fillna(0, inplace=True)
-
+# Handle empty cells
 df = all_data.apply(lambda x: x.fillna(0) if x.dtype.kind in "biufc" else x.fillna("0"))
-# all_data.fillna(0, inplace=True)
-print(all_data.shape)
-# print(all_data["IsMalware"])
 
-
-# strings = df1.select_dtypes(include="object")
-# print(strings.columns)
-# result = pd.concat([df1, df2], axis=1)
-# print(result.shape)
-
-
-# orig = pd.read_csv(input_file)
-# df = orig.copy()
-
-
+# Dropping date value as it makes 1h encoding too costly
 df = df.drop(columns=["TimeDateStamp"])
-# Makes 1h encoding too big/costly
 
 y = df["IsMalware"]
 x = df.drop("IsMalware", axis=1)
 
-# print(y)
-print(y.shape)
-print(x.shape)
-
 # Feature scaling
 scale_transform = MaxAbsScaler()
 
-# One hot encoding, transforms categorical to ML friendly variables
+# One hot encoding, transforms categorical data to ML friendly variables
 onehot_transform = OneHotEncoder(handle_unknown="ignore")
+
+# todo: test alternate methods of encoding e.g. hash vectorising. 1h encoding not ideal for decision trees
 
 column_trans = ColumnTransformer(
     transformers=[
         ("Numerical", scale_transform, selector(dtype_include="number")),
         ("Categorical", onehot_transform, selector(dtype_include="object")),
     ],
-    remainder="passthrough",
+    # remainder="passthrough",
+    # remainder option improves stability but must be disabled to extract feature names after encoding
 )
 
-preprocess = Pipeline(steps=[("preprocess", column_trans)])
+pipeline = Pipeline(steps=[("preprocess", column_trans)])
 
-# Preprocessing
-x = preprocess.fit_transform(x)
-# It is bad practice to have split after transform- fix
+# Preprocessing and vectorise
+X = pipeline.fit_transform(x)
 
-X_train, X_test, y_train, y_test = train_test_split(x, y, random_state=4)
+# todo: fix as is bad practice to have split after preprocessing
 
-clf = DecisionTreeClassifier().fit(X_train, y_train)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5, random_state=4)
+# default train/test split is 0.75:0.25
 
-print(
-    "Accuracy of Decision Tree classifier on training set: {:.2f}".format(
-        clf.score(X_train, y_train)
-    )
-)
-print(
-    "Accuracy of Decision Tree classifier on test set: {:.2f}".format(
-        clf.score(X_test, y_test)
-    )
-)
+skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=1)
 
-with open("decision_tree_model_results.txt", "w") as file:
-    results = [
-        "Accuracy of Decision Tree classifier on training set:",
-        str(clf.score(X_train, y_train)),
-        "\n",
-        "Accuracy of Decision Tree classifier on test set:",
-        str(clf.score(X_test, y_test)),
+# Switches to enable tuning/plotting
+previously_tuned = True
+plot_validate_params = False
+performance_report = True
+
+# Hyperparameter tuning, use randomised over grid search for speed
+if previously_tuned == False:
+    tuned_parameters = [
+        {
+            "splitter": ["best", "random"],
+            "max_depth": [2, 5, 10, 20, 40],
+            "min_samples_split": [0.1, 0.2, 0.3, 4, 5, 10, 15],
+            "min_samples_leaf": [0.2, 2, 10],
+        },
     ]
-    file.writelines(results)
+
+    scores = ["precision", "recall"]
+    n_iter_search = 40
+
+    for score in scores:
+        print("# Tuning hyper-parameters for %s" % score)
+
+        clf = RandomizedSearchCV(
+            DecisionTreeClassifier(random_state=0),
+            tuned_parameters,
+            n_iter=n_iter_search,
+            scoring="%s_macro" % score,
+        )
+        # note GridSearch automatically uses StratKFold x-validation
+        clf.fit(X_train, y_train)
+        print("Best parameters set found on development set:")
+        print()
+        print(clf.best_params_)
+        print()
+        print("Grid scores on development set:")
+        print()
+        means = clf.cv_results_["mean_test_score"]
+        stds = clf.cv_results_["std_test_score"]
+        for mean, std, params in zip(means, stds, clf.cv_results_["params"]):
+            print("%0.3f (+/-%0.03f) for %r" % (mean, std * 2, params))
+        print()
+
+        print("Detailed classification report:")
+        print()
+        print("The model is trained on the full development set.")
+        print("The scores are computed on the full evaluation set.")
+        print()
+        y_true, y_pred = y_test, clf.predict(X_test)
+        print(classification_report(y_true, y_pred))
+        print()
+elif plot_validate_params == True:
+    # Skip tuning if already have optimal hyperparameters, plot validation curves to verify
+    # Optimal params = {'max_depth': 5, 'min_samples_leaf': 2, 'min_samples_split': 2, 'splitter': 'best'}
+
+    # Max depth validation
+    max_depth_range = list(range(1, 40))
+
+    train_scores, test_scores = validation_curve(
+        DecisionTreeClassifier(
+            random_state=0, splitter="random", min_samples_split=2, min_samples_leaf=2
+        ),
+        X_train,
+        y_train,
+        param_name="max_depth",
+        param_range=max_depth_range,
+        scoring="accuracy",
+        cv=skf,
+        n_jobs=1,
+    )
+
+    train_scores_mean = np.mean(train_scores, axis=1)
+    train_scores_std = np.std(train_scores, axis=1)
+    test_scores_mean = np.mean(test_scores, axis=1)
+    test_scores_std = np.std(test_scores, axis=1)
+
+    fig, ax = plt.subplots()
+    plt.title("Decision Tree Max Depth Validation Curve")
+    plt.xlabel("Tree Depth")
+    plt.ylabel("Score")
+
+    lw = 2
+    plt.semilogx(
+        max_depth_range,
+        train_scores_mean,
+        label="Training score",
+        color="darkorange",
+        lw=lw,
+    )
+    plt.fill_between(
+        max_depth_range,
+        train_scores_mean - train_scores_std,
+        train_scores_mean + train_scores_std,
+        alpha=0.2,
+        color="darkorange",
+        lw=lw,
+    )
+    plt.semilogx(
+        max_depth_range,
+        test_scores_mean,
+        label="Cross-validation score",
+        color="navy",
+        lw=lw,
+    )
+    plt.fill_between(
+        max_depth_range,
+        test_scores_mean - test_scores_std,
+        test_scores_mean + test_scores_std,
+        alpha=0.2,
+        color="navy",
+        lw=lw,
+    )
+    plt.legend(loc="best")
+
+    plt.savefig("tree_depth_validation.png")
+    """
+    """
+    # Min samples split validation
+    samples_split_range = list(range(2, 20))
+    for x in range(1, 10):
+        samples_split_range.append(x * 0.1)
+    samples_split_range.sort()
+
+    train_scores, test_scores = validation_curve(
+        DecisionTreeClassifier(
+            random_state=0, splitter="best", min_samples_leaf=2, max_depth=5
+        ),
+        X_train,
+        y_train,
+        param_name="min_samples_split",
+        param_range=samples_split_range,
+        scoring="accuracy",
+        cv=skf,
+        n_jobs=1,
+    )
+
+    train_scores_mean = np.mean(train_scores, axis=1)
+    train_scores_std = np.std(train_scores, axis=1)
+    test_scores_mean = np.mean(test_scores, axis=1)
+    test_scores_std = np.std(test_scores, axis=1)
+
+    fig, ax = plt.subplots()
+    plt.title("Decision Tree Min Samples Split Validation Curve")
+    plt.xlabel("Minimum Samples Split")
+    plt.ylabel("Score")
+
+    lw = 2
+    plt.semilogx(
+        samples_split_range,
+        train_scores_mean,
+        label="Training score",
+        color="darkorange",
+        lw=lw,
+    )
+    plt.fill_between(
+        samples_split_range,
+        train_scores_mean - train_scores_std,
+        train_scores_mean + train_scores_std,
+        alpha=0.2,
+        color="darkorange",
+        lw=lw,
+    )
+    plt.semilogx(
+        samples_split_range,
+        test_scores_mean,
+        label="Cross-validation score",
+        color="navy",
+        lw=lw,
+    )
+    plt.fill_between(
+        samples_split_range,
+        test_scores_mean - test_scores_std,
+        test_scores_mean + test_scores_std,
+        alpha=0.2,
+        color="navy",
+        lw=lw,
+    )
+    plt.legend(loc="best")
+
+    plt.savefig("samples_split_tree_validation.png")
+
+    # Min samples leaf validation
+    samples_leaf_range = list(range(2, 40))
+    for x in range(1, 10):
+        samples_leaf_range.append(x * 0.1)
+    samples_leaf_range.sort()
+
+    train_scores, test_scores = validation_curve(
+        DecisionTreeClassifier(
+            random_state=0, splitter="best", min_samples_split=2, max_depth=5
+        ),
+        X_train,
+        y_train,
+        param_name="min_samples_split",
+        param_range=samples_leaf_range,
+        scoring="accuracy",
+        cv=skf,
+        n_jobs=1,
+    )
+
+    train_scores_mean = np.mean(train_scores, axis=1)
+    train_scores_std = np.std(train_scores, axis=1)
+    test_scores_mean = np.mean(test_scores, axis=1)
+    test_scores_std = np.std(test_scores, axis=1)
+
+    fig, ax = plt.subplots()
+    plt.title("Decision Tree Min Samples Leaf Validation Curve")
+    plt.xlabel("Minimum Samples Leaf")
+    plt.ylabel("Score")
+
+    lw = 2
+    plt.semilogx(
+        samples_leaf_range,
+        train_scores_mean,
+        label="Training score",
+        color="darkorange",
+        lw=lw,
+    )
+    plt.fill_between(
+        samples_leaf_range,
+        train_scores_mean - train_scores_std,
+        train_scores_mean + train_scores_std,
+        alpha=0.2,
+        color="darkorange",
+        lw=lw,
+    )
+    plt.semilogx(
+        samples_leaf_range,
+        test_scores_mean,
+        label="Cross-validation score",
+        color="navy",
+        lw=lw,
+    )
+    plt.fill_between(
+        samples_leaf_range,
+        test_scores_mean - test_scores_std,
+        test_scores_mean + test_scores_std,
+        alpha=0.2,
+        color="navy",
+        lw=lw,
+    )
+    plt.legend(loc="best")
+
+    plt.savefig("samples_leaf_tree_validation.png")
+
+elif performance_report == True:
+    clf = DecisionTreeClassifier(
+        random_state=0,
+        max_depth=10,
+        min_samples_leaf=2,
+        min_samples_split=5,
+        splitter="best",
+    ).fit(X_train, y_train)
+
+    y_predicted = clf.predict(X_test)
+
+    y_score = clf.predict_proba(X_test)[:, 1]
+    print("Area under ROC curve score:")
+    print(roc_auc_score(y_test, y_score))
+
+    print(
+        "Accuracy of Decision Tree classifier on training set: {:.3f}".format(
+            clf.score(X_train, y_train)
+        )
+    )
+    print(
+        "Accuracy of Decision Tree classifier on test set: {:.3f}".format(
+            clf.score(X_test, y_test)
+        )
+    )
+
+    report = classification_report(
+        y_test, y_predicted, target_names=["Benign", "Malware"]
+    )
+
+    print("Classification report:\n", report)
+
+    # Create tree diagram
+    tree_structure = export_text(clf, feature_names=get_ct_feature_names(column_trans))
+    dot_data = export_graphviz(
+        clf,
+        out_file="decision_tree.dot",
+        feature_names=get_ct_feature_names(column_trans),
+        filled=True,
+        rounded=True,
+        special_characters=True,
+    )
+    (graph,) = pydot.graph_from_dot_file("decision_tree.dot")
+    graph.write_png("decision_tree.png")
+
+    # Print confusion matrix
+    disp = plot_confusion_matrix(
+        clf,
+        X_test,
+        y_test,
+        display_labels=["Benign", "Malware"],
+        cmap=plt.cm.get_cmap("Spectral"),
+    )
+    disp.ax_.set_title("Confusion Matrix")
+    print(disp.confusion_matrix)
+
+    plt.show()
+    plt.savefig("confusion_matrix.png")
