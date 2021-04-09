@@ -5,6 +5,7 @@ import pydot
 import matplotlib.pyplot as plt
 
 from sklearn.model_selection import ShuffleSplit
+from sklearn.metrics import confusion_matrix
 
 from sklearn.preprocessing import MaxAbsScaler
 from sklearn.preprocessing import OneHotEncoder
@@ -14,6 +15,9 @@ from sklearn.model_selection import train_test_split
 
 from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.model_selection import KFold, StratifiedKFold
+
+from sklearn.metrics import auc
+from sklearn.metrics import plot_roc_curve
 
 from sklearn.pipeline import Pipeline
 from sklearn.compose import make_column_selector as selector
@@ -135,12 +139,14 @@ def report(results, n_top=3):
 np.set_printoptions(precision=2)
 
 df1 = pd.read_csv(input_file, dtype=generate_types(input_file))
-df2 = pd.read_csv(input_file_2, dtype=generate_types(input_file_2))
+# df2 = pd.read_csv(input_file_2, dtype=generate_types(input_file_2))
 df3 = pd.read_csv(input_file_3, dtype=generate_types(input_file_3))
 df4 = pd.read_csv(input_file_4, dtype=generate_types(input_file_4))
-df5 = pd.read_csv(input_file_5, dtype=generate_types(input_file_4))
+# df5 = pd.read_csv(input_file_5, dtype=generate_types(input_file_4))
 
-all_data = pd.concat([df1, df2, df3, df4, df5], axis=0)
+# all_data = pd.concat([df1, df2, df3, df4, df5], axis=0)
+
+all_data = pd.concat([df1, df3, df4], axis=0)
 
 # Handle empty cells
 df = all_data.apply(lambda x: x.fillna(0) if x.dtype.kind in "biufc" else x.fillna("0"))
@@ -178,13 +184,14 @@ X = pipeline.fit_transform(x)
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5, random_state=4)
 # default train/test split is 0.75:0.25
 
-skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=1)
+skf = StratifiedKFold(n_splits=6, shuffle=True, random_state=1)
 
 # Switches to enable tuning/plotting
 previously_tuned = True
 plot_validate_params = False
-performance_report = False
-plot_learning_curve = True
+performance_report = True
+plot_learning_curve = False
+
 
 # Hyperparameter tuning, use randomised over grid search for speed
 if previously_tuned == False:
@@ -457,6 +464,26 @@ elif performance_report == True:
 
     print("Classification report:\n", report)
 
+    print("Roc plot\n")
+
+    tn, fp, fn, tp = confusion_matrix(y_test, y_predicted, normalize="true").ravel()
+    print("fp", fp)
+    print("tp", tp)
+    plt.figure()
+    lw = 2
+    plt.scatter(
+        fp, tp, color="darkorange", lw=lw, label="decision tree classifier",
+    )
+    plt.plot([0, 1], [0, 1], color="navy", lw=lw, linestyle="--", label="random guess")
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel("False Positives")
+    plt.ylabel("True Positives")
+    plt.title("Receiver operating characteristic example")
+    plt.legend(loc="lower right")
+    plt.show()
+    plt.savefig("roc_plot.png")
+
     # Create tree diagram
     tree_structure = export_text(clf, feature_names=get_ct_feature_names(column_trans))
     dot_data = export_graphviz(
@@ -483,6 +510,7 @@ elif performance_report == True:
 
     plt.show()
     plt.savefig("confusion_matrix.png")
+
 elif plot_learning_curve == True:
     fig, ax = plt.subplots()
 
@@ -495,12 +523,7 @@ elif plot_learning_curve == True:
     )
 
     train_sizes, train_scores, test_scores = learning_curve(
-        clf,
-        X,
-        y,
-        train_sizes=np.linspace(0.1, 1, 10),
-        scoring="accuracy",
-        cv=skf,
+        clf, X, y, train_sizes=np.linspace(0.1, 1, 10), scoring="accuracy", cv=skf,
     )
 
     train_scores_mean = np.mean(train_scores, axis=1)
