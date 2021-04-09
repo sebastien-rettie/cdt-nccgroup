@@ -139,14 +139,13 @@ def report(results, n_top=3):
 np.set_printoptions(precision=2)
 
 df1 = pd.read_csv(input_file, dtype=generate_types(input_file))
-# df2 = pd.read_csv(input_file_2, dtype=generate_types(input_file_2))
+df2 = pd.read_csv(input_file_2, dtype=generate_types(input_file_2))
 df3 = pd.read_csv(input_file_3, dtype=generate_types(input_file_3))
 df4 = pd.read_csv(input_file_4, dtype=generate_types(input_file_4))
-# df5 = pd.read_csv(input_file_5, dtype=generate_types(input_file_4))
+df5 = pd.read_csv(input_file_5, dtype=generate_types(input_file_4))
 
-# all_data = pd.concat([df1, df2, df3, df4, df5], axis=0)
+all_data = pd.concat([df1, df2, df3, df4, df5], axis=0)
 
-all_data = pd.concat([df1, df3, df4], axis=0)
 
 # Handle empty cells
 df = all_data.apply(lambda x: x.fillna(0) if x.dtype.kind in "biufc" else x.fillna("0"))
