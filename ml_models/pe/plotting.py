@@ -89,7 +89,6 @@ def plot_learning_curve(clf, X, y):
     plt.ylabel("Accuracy")
     plt.title("Learning Curve")
 
-    plt.show()
     plt.savefig("learning_curve.png")
 
 

@@ -27,9 +27,10 @@ from sklearn.model_selection import (
     train_test_split,
 )
 
-from sklearn.tree import DecisionTreeClassifier, export_graphviz, export_text
+from sklearn.tree import export_graphviz, export_text
 
-from pe_plotting import (
+from plotting import (
+    adjusted_classes,
     plot_calibration_curve,
     plot_learning_curve,
     precision_recall_threshold,
@@ -37,17 +38,16 @@ from pe_plotting import (
     plot_roc_curve,
     plot_validation_curve,
 )
-from pe_preprocessing import (
+from preprocessing import (
     concat_files,
     encode_scale,
     generate_types,
     get_ct_feature_names,
-    get_feature_out,
     preprocess_dataframe,
 )
 
-input_file_2 = "../dataset/benign/benign-exe.csv"
-input_file_3 = "../dataset/malware/00355_malware.csv"
+input_file_2 = "../../dataset/benign/benign-exe.csv"
+input_file_3 = "../../dataset/malware/00355_malware.csv"
 
 list_files = [input_file_2, input_file_3]
 
@@ -86,42 +86,8 @@ def grid_search_wrapper(refit_score="precision_score"):
     return grid_search
 
 
-"""def adjusted_classes(y_score, t):
-   
-    return [1 if y >= t else 0 for y in y_score]
-
-
-def precision_recall_threshold(p, r, thresholds, t=0.5):
-   
-
-    # generate new class predictions based on the adjusted_classes
-    # function above and view the resulting confusion matrix.
-    y_pred_adj = adjusted_classes(y_score, t)
-    print(
-        pd.DataFrame(
-            confusion_matrix(y_test, y_pred_adj),
-            columns=["pred_neg", "pred_pos"],
-            index=["neg", "pos"],
-        )
-    )
-
-    # plot the curve
-    plt.figure(figsize=(8, 8))
-    plt.title("Precision and Recall curve ^ = current threshold")
-    plt.step(r, p, color="b", alpha=0.2, where="post")
-    plt.fill_between(r, p, step="post", alpha=0.2, color="b")
-    plt.ylim([0.5, 1.01])
-    plt.xlim([0.5, 1.01])
-    plt.xlabel("Recall")
-    plt.ylabel("Precision")
-    plt.savefig("precision_recall_threshold.png")
-
-    # plot the current threshold on the line
-    close_default_clf = np.argmin(np.abs(thresholds - t))
-    plt.plot(r[close_default_clf], p[close_default_clf], "^", c="k", markersize=15)
-"""
-
 np.set_printoptions(precision=2)
+
 # EITHER concatenate disparate data files
 """
 df = concat_files(list_files)
@@ -136,13 +102,13 @@ y = df["IsMalware"]
 X = df.drop("IsMalware", axis=1)
 
 # EITHER fit and save encoder
-"""column_trans = encode_scale().fit(X)
+column_trans = encode_scale().fit(X)
 with open("encoder.pickle", "wb") as f:
-    pickle.dump(column_trans, f)"""
+    pickle.dump(column_trans, f)
 
 # OR import prefit encoder
-with open("encoder.pickle", "rb") as f:
-    column_trans = pickle.load(f, encoding="bytes")
+"""with open("encoder.pickle", "rb") as f:
+    column_trans = pickle.load(f, encoding="bytes")"""
 
 X = column_trans.transform(X)
 
@@ -150,7 +116,7 @@ X = column_trans.transform(X)
 # Note it is bad practice to have split after transform- fix
 X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=4)
 
-# Switches to enable hyperparamttuning/plotting
+# Switches to enable hyperparameter tuning/plotting
 previously_tuned = True
 plot_validate_params = False
 performance_report = True
@@ -211,12 +177,20 @@ elif plot_validate_params:
 
     max_depth_name = "max_depth"
 
-    clf = DecisionTreeClassifier(
-        random_state=0, splitter="random", min_samples_split=2, min_samples_leaf=2
+    clf = RandomForestClassifier(
+        max_features=10,
+        min_samples_split=5,
+        n_estimators=5,
+        random_state=0,
     )
 
     plot_validation_curve(
-        max_depth_name, max_depth_range, clf, X_train, y_train, "Max depth validation"
+        max_depth_name,
+        max_depth_range,
+        clf,
+        X_train,
+        y_train,
+        "Max depth RF validation",
     )
 
     # Min samples split validation
@@ -227,8 +201,11 @@ elif plot_validate_params:
 
     samples_split_name = "min_samples_split"
 
-    clf = DecisionTreeClassifier(
-        random_state=0, splitter="best", min_samples_leaf=2, max_depth=5
+    clf = RandomForestClassifier(
+        max_depth=5,
+        max_features=10,
+        n_estimators=5,
+        random_state=0,
     )
 
     plot_validation_curve(
@@ -237,7 +214,7 @@ elif plot_validate_params:
         clf,
         X_train,
         y_train,
-        "Min samp validation",
+        "Min sample split RF validation",
     )
 
 
@@ -274,7 +251,8 @@ elif performance_report:
     )
     np.set_printoptions(precision=4)
 
-    print("Feature Importances", clf.feature_importances_)
+    print("Feature Importances")
+
     importances = clf.feature_importances_
     feature_names = get_ct_feature_names(column_trans)
 
@@ -315,7 +293,8 @@ elif performance_report:
     precision_recall_threshold(p, r, thresholds, y_score, y_test, 0.30)
     plot_precision_recall_vs_threshold(p, r, thresholds)
 
-    """To use new threshold:
+    """
+    To use new threshold:
     predicted_proba = clf.predict_proba(X_test)
     predicted = (predicted_proba [:,1] >= threshold).astype('int')
 
@@ -324,7 +303,7 @@ elif performance_report:
 
     print("Roc plot\n")
     fpr, tpr, auc_thresholds = roc_curve(y_test, y_score)
-    print("Area under ROC curve:"auc(fpr, tpr))  # AUC of ROC
+    print("Area under ROC curve:", auc(fpr, tpr))  # AUC of ROC
     plot_roc_curve(fpr, tpr, "recall_optimized")
 
     # Grab a single tree diagram

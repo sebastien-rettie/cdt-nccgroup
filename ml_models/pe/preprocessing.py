@@ -12,6 +12,8 @@ from sklearn.feature_selection._base import SelectorMixin
 from sklearn.feature_extraction.text import _VectorizerMixin
 
 
+# Function to read certain columns as objects not floats.
+# Reduces overhead of pandas trying to decide for itself.
 def generate_types(datafile):
     col_names = pd.read_csv(datafile, nrows=0).columns
     dtypes = {col: "float64" for col in col_names}
@@ -67,8 +69,8 @@ def preprocess_dataframe(input_dataframe):
     input_dataframe = input_dataframe.apply(
         lambda x: x.fillna(0) if x.dtype.kind in "biufc" else x.fillna("0")
     )
-    input_dataframe = input_dataframe.drop(columns=["TimeDateStamp"])
-    # todo - drops as makes 1h encoding too big/costly, but would be nice to keep
+    input_dataframe = input_dataframe.drop(columns=["TimeDateStamp", "e_res", "e_res2"])
+    # todo - drops date as makes 1h encoding too big/costly, but would be nice to keep
     return input_dataframe
 
 
