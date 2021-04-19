@@ -4,6 +4,8 @@
 
 # Can expand to include function imports
 
+# todo: Update this to record filename
+
 import pefile
 import sys, os
 import csv
@@ -89,11 +91,17 @@ for executable in file_list:
 
         sect_no += 1
 
+    item_list.append("SampleName")
+    head, tail = os.path.split(executable)
+    var_list.append(str(tail))
+
     section_dict = dict(zip(item_list, var_list))
     header_dict.update(section_dict)
 
     # Write to list of dataframes
     df = pd.DataFrame.from_dict(header_dict, orient="index")
+    # Test this
+    # df = df.set_index("SampleName")
     dataframe_list.append(df.T)
 
 
@@ -101,11 +109,12 @@ for executable in file_list:
 
 
 final_df = pd.concat(dataframe_list)
+final_df = final_df.set_index("SampleName")
 final_df.fillna(0, inplace=True)
 
 if malware == True:
     final_df["IsMalware"] = 1
-    final_df.to_csv("processed_malware.csv", index=False)
+    final_df.to_csv("processed_malware.csv")
 elif malware == False:
     final_df["IsMalware"] = 0
-    final_df.to_csv("processed_benign.csv", index=False)
+    final_df.to_csv("processed_benign.csv")
