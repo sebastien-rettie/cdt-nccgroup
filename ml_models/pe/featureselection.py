@@ -93,7 +93,10 @@ param_grid = [
 ]
 reducer_labels = ["PCA", "KBest(chi2)", "KBest(mutual info"]
 estimator = DecisionTreeClassifier(
-    random_state=0, splitter="best", min_samples_split=2, min_samples_leaf=2,
+    random_state=0,
+    splitter="best",
+    min_samples_split=2,
+    min_samples_leaf=2,
 )
 print(estimator.get_params().keys())
 
@@ -151,7 +154,6 @@ score_stds = list()
 percentiles = (1, 3, 6)
 
 for percentile in percentiles:
-    print("start!", feature_num)
     clf.set_params(anova__percentile=percentile)
     this_scores = cross_val_score(clf, X, y)
     score_means.append(this_scores.mean())
