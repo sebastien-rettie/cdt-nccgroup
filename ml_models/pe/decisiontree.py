@@ -64,28 +64,27 @@ df = concat_files(list_files)
 """
 # OR if reading from pre-concatenated data
 input_file = "all_data.csv"
-df = pd.read_csv(input_file, dtype=generate_types(input_file))
+df = pd.read_csv(input_file, index_col="SampleName", dtype=generate_types(input_file))
 
 df = preprocess_dataframe(df)
 
 y = df["IsMalware"]
 X = df.drop("IsMalware", axis=1)
 
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=4)
+
 # EITHER fit and save encoder
-column_trans = encode_scale().fit(X)
+encoder = encode_scale().fit(X_train)
 with open("encoder.pickle", "wb") as f:
-    pickle.dump(column_trans, f)
+    pickle.dump(encoder, f)
 
 # OR import prefit encoder
 """with open("encoder.pickle", "rb") as f:
-    column_trans = pickle.load(f, encoding="bytes")"""
+    encode_scale = pickle.load(f, encoding="bytes")"""
 
-X = column_trans.transform(X)
-
-
-# Note it is bad practice to have split after transform- fix
-X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=4)
-
+X_train = encoder.transform(X_train)
+X_test = encoder.transform(X_test)
 
 skf = StratifiedKFold(n_splits=6, shuffle=True, random_state=1)
 
@@ -189,7 +188,12 @@ elif performance_report:
 
     y_predicted = clf.predict(X_test)
 
+    y_test_array = np.asarray(y_test)
+    misclassified = y_test_array != y_predicted
+    print("Misclassified samples:", y_test[misclassified].index)
+
     y_score = clf.predict_proba(X_test)[:, 1]
+
     print("Area under ROC curve score:")
     print(roc_auc_score(y_test, y_score))
 
@@ -244,7 +248,7 @@ elif performance_report:
 
     plt.savefig("roc_plot.png")
     plt.show()
-
+    """
     # Create tree diagram
     tree_structure = export_text(clf, feature_names=get_ct_feature_names(column_trans))
     dot_data = export_graphviz(
@@ -257,7 +261,7 @@ elif performance_report:
     )
     (graph,) = pydot.graph_from_dot_file("decision_tree.dot")
     graph.write_png("decision_tree.png")
-
+    """
     # Print confusion matrix
     disp = plot_confusion_matrix(
         clf,

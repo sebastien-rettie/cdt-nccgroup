@@ -22,7 +22,7 @@ from sklearn.feature_selection import mutual_info_classif
 from sklearn.tree import DecisionTreeClassifier, export_graphviz
 from sklearn.model_selection import RandomizedSearchCV, GridSearchCV, cross_val_score
 from sklearn.svm import SVC
-from pe_preprocessing import (
+from preprocessing import (
     generate_types,
     concat_files,
     preprocess_dataframe,
@@ -47,17 +47,20 @@ df = preprocess_dataframe(df)
 
 y = df["IsMalware"]
 X = df.drop("IsMalware", axis=1)
+# Note it is bad practice to have split after transform- fix
+X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=4)
 
 # EITHER fit and save encoder
-"""encoder = encode_scale().fit(X)
+encoder = encode_scale().fit(X_train)
 with open("encoder.pickle", "wb") as f:
-    pickle.dump(encoder, f)"""
+    pickle.dump(encoder, f)
 
 # OR import prefit encoder
-with open("encoder.pickle", "rb") as f:
-    encoder = pickle.load(f, encoding="bytes")
+"""with open("encoder.pickle", "rb") as f:
+    encode_scale = pickle.load(f, encoding="bytes")"""
 
-X = encoder.transform(X)
+X_train = encoder.transform(X_train)
+X_test = encoder.transform(X_test)
 
 pipeline = Pipeline(
     [
@@ -91,7 +94,7 @@ param_grid = [
         "classify__max_depth": MD_OPTIONS,
     },
 ]
-reducer_labels = ["PCA", "KBest(chi2)", "KBest(mutual info"]
+reducer_labels = ["PCA", "KBest(chi2)", "KBest(mutual info)"]
 estimator = DecisionTreeClassifier(
     random_state=0,
     splitter="best",

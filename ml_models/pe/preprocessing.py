@@ -11,6 +11,12 @@ from sklearn.pipeline import Pipeline
 from sklearn.feature_selection._base import SelectorMixin
 from sklearn.feature_extraction.text import _VectorizerMixin
 
+from sklearn.model_selection import (
+    GridSearchCV,
+    StratifiedKFold,
+)
+
+from sklearn.metrics import confusion_matrix
 
 # Function to read certain columns as objects not floats.
 # Reduces overhead of pandas trying to decide for itself.
@@ -18,6 +24,7 @@ def generate_types(datafile):
     col_names = pd.read_csv(datafile, nrows=0).columns
     dtypes = {col: "float64" for col in col_names}
     string_columns = [
+        "SampleName",
         "Name0",
         "Name1",
         "Name10",
@@ -125,3 +132,46 @@ def get_ct_feature_names(ct):
             output_features.extend(ct._feature_names_in[features])
 
     return output_features
+
+
+def grid_search_wrapper(
+    clf,
+    param_grid,
+    scorers,
+    X_train,
+    X_test,
+    y_train,
+    y_test,
+    refit_score="accuracy_score",
+):
+    """
+    fits a GridSearchCV classifier using refit_score for optimization
+    prints classifier performance metrics
+    """
+    skf = StratifiedKFold(n_splits=10, shuffle=True, random_state=1)
+    grid_search = GridSearchCV(
+        clf,
+        param_grid,
+        scoring=scorers,
+        refit=refit_score,
+        cv=skf,
+        return_train_score=True,
+        n_jobs=-1,
+    )
+    grid_search.fit(X_train, y_train)
+
+    # make the predictions
+    y_pred = grid_search.predict(X_test)
+
+    print("Best params for {}".format(refit_score))
+    print(grid_search.best_params_)
+
+    # confusion matrix on the test data.
+    print(
+        pd.DataFrame(
+            confusion_matrix(y_test, y_pred),
+            columns=["pred_neg", "pred_pos"],
+            index=["neg", "pos"],
+        )
+    )
+    return grid_search

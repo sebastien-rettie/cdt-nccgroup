@@ -4,8 +4,6 @@
 
 # Can expand to include function imports
 
-# todo: Update this to record filename
-
 import pefile
 import sys, os
 import csv
@@ -93,15 +91,15 @@ for executable in file_list:
 
     item_list.append("SampleName")
     head, tail = os.path.split(executable)
-    var_list.append(str(tail))
+    tail = str(tail)
+    tail.replace(" ", "")
+    var_list.append(tail)
 
     section_dict = dict(zip(item_list, var_list))
     header_dict.update(section_dict)
 
     # Write to list of dataframes
     df = pd.DataFrame.from_dict(header_dict, orient="index")
-    # Test this
-    # df = df.set_index("SampleName")
     dataframe_list.append(df.T)
 
 

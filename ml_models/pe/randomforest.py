@@ -44,47 +44,13 @@ from preprocessing import (
     generate_types,
     get_ct_feature_names,
     preprocess_dataframe,
+    grid_search_wrapper,
 )
 
 input_file_2 = "../../dataset/benign/benign-exe.csv"
 input_file_3 = "../../dataset/malware/00355_malware.csv"
 
 list_files = [input_file_2, input_file_3]
-
-
-def grid_search_wrapper(refit_score="precision_score"):
-    """
-    fits a GridSearchCV classifier using refit_score for optimization
-    prints classifier performance metrics
-    """
-    skf = StratifiedKFold(n_splits=10, shuffle=True, random_state=1)
-    grid_search = GridSearchCV(
-        clf,
-        param_grid,
-        scoring=scorers,
-        refit=refit_score,
-        cv=skf,
-        return_train_score=True,
-        n_jobs=-1,
-    )
-    grid_search.fit(X_train, y_train)
-
-    # make the predictions
-    y_pred = grid_search.predict(X_test)
-
-    print("Best params for {}".format(refit_score))
-    print(grid_search.best_params_)
-
-    # confusion matrix on the test data.
-    print(
-        pd.DataFrame(
-            confusion_matrix(y_test, y_pred),
-            columns=["pred_neg", "pred_pos"],
-            index=["neg", "pos"],
-        )
-    )
-    return grid_search
-
 
 np.set_printoptions(precision=2)
 
@@ -101,45 +67,44 @@ df = preprocess_dataframe(df)
 y = df["IsMalware"]
 X = df.drop("IsMalware", axis=1)
 
+X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=4)
+
 # EITHER fit and save encoder
-column_trans = encode_scale().fit(X)
+encoder = encode_scale().fit(X_train)
 with open("encoder.pickle", "wb") as f:
-    pickle.dump(column_trans, f)
+    pickle.dump(encoder, f)
 
 # OR import prefit encoder
 """with open("encoder.pickle", "rb") as f:
-    column_trans = pickle.load(f, encoding="bytes")"""
+    encode_scale = pickle.load(f, encoding="bytes")"""
 
-X = column_trans.transform(X)
-
-
-# Note it is bad practice to have split after transform- fix
-X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=4)
+X_train = encoder.transform(X_train)
+X_test = encoder.transform(X_test)
 
 # Switches to enable hyperparameter tuning/plotting
-previously_tuned = True
+previously_tuned = False
 plot_validate_params = False
-performance_report = True
+performance_report = False
 
 
 clf = RandomForestClassifier(
     max_depth=5,
-    max_features=10,
+    max_features=5,
     min_samples_split=5,
-    n_estimators=5,
+    n_estimators=3,
     random_state=0,
 )
 
 
 # Hyperparameter tuning, uses grid search optimise for recall
-# Skip tuning if already have optimal hyperparameters
+# Skip tuning if already have optimal hyperparameters, want highest recall without compromising accuracy
 if previously_tuned == False:
     clf = RandomForestClassifier(n_jobs=-1)
     param_grid = {
-        "min_samples_split": [3, 5, 10],
-        "n_estimators": [100, 300],
-        "max_depth": [3, 5, 15, 25],
-        "max_features": [3, 5, 10, 20],
+        "min_samples_split": [3, 5],
+        "n_estimators": [3, 5],
+        "max_depth": [3, 5],
+        "max_features": [3, 5],
     }
 
     scorers = {
@@ -147,13 +112,23 @@ if previously_tuned == False:
         "recall_score": make_scorer(recall_score),
         "accuracy_score": make_scorer(accuracy_score),
     }
-    grid_search_clf = grid_search_wrapper(refit_score="recall_score")
+    grid_search_clf = grid_search_wrapper(
+        clf,
+        param_grid,
+        scorers,
+        X_train,
+        X_test,
+        y_train,
+        y_test,
+        refit_score="accuracy_score",
+    )
 
     results = pd.DataFrame(grid_search_clf.cv_results_)
-    results = results.sort_values(by="mean_test_precision_score", ascending=False)
+    results = results.sort_values(by="mean_test_accuracy_score", ascending=False)
     print(
         results[
             [
+                "mean_test_accuracy_score",
                 "mean_test_precision_score",
                 "mean_test_recall_score",
                 "mean_test_accuracy_score",
@@ -220,10 +195,10 @@ elif plot_validate_params:
 
 elif performance_report:
     clf = RandomForestClassifier(
-        max_depth=5,
-        max_features=10,
+        max_depth=3,
+        max_features=5,
         min_samples_split=5,
-        n_estimators=5,
+        n_estimators=3,
         random_state=0,
     ).fit(X_train, y_train)
 
