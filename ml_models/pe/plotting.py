@@ -24,7 +24,7 @@ def plot_precision_recall_vs_threshold(precisions, recalls, thresholds):
     plt.ylabel("Score")
     plt.xlabel("Decision Threshold")
     plt.legend(loc="best")
-    plt.savefig("precision_recall_curve.png")
+    plt.savefig("graphs/precision_recall_curve.png")
 
 
 def plot_roc_curve(fpr, tpr, label=None):
@@ -41,7 +41,7 @@ def plot_roc_curve(fpr, tpr, label=None):
     plt.xlabel("False Positive Rate")
     plt.ylabel("True Positive Rate (Recall)")
     plt.legend(loc="best")
-    plt.savefig("roc_curve.png")
+    plt.savefig("graphs/" + str(label) + "roc_curve.png")
 
 
 def plot_learning_curve(clf, X, y):
@@ -89,7 +89,7 @@ def plot_learning_curve(clf, X, y):
     plt.ylabel("Accuracy")
     plt.title("Learning Curve")
 
-    plt.savefig("learning_curve.png")
+    plt.savefig("graphs/learning_curve.png")
 
 
 def plot_calibration_curve(clf, X_test, y_test):
@@ -119,7 +119,7 @@ def plot_calibration_curve(clf, X_test, y_test):
     ax2.legend(loc="upper center", ncol=2)
 
     plt.tight_layout()
-    plt.savefig("calibration_RF.png")
+    plt.savefig("graphs/calibration.png")
 
 
 def plot_validation_curve(
@@ -180,7 +180,7 @@ def plot_validation_curve(
         lw=lw,
     )
     plt.legend(loc="best")
-    plot_file_name = str(parameter_name) + "_validation.png"
+    plot_file_name = "graphs/" + str(parameter_name) + "_validation.png"
     plt.savefig(plot_file_name)
 
 
@@ -218,7 +218,7 @@ def precision_recall_threshold(p, r, thresholds, y_score, y_test, t=0.5):
     plt.xlim([0.5, 1.01])
     plt.xlabel("Recall")
     plt.ylabel("Precision")
-    plt.savefig("precision_recall_threshold.png")
+    plt.savefig("graphs/precision_recall_threshold.png")
 
     # plot the current threshold on the line
     close_default_clf = np.argmin(np.abs(thresholds - t))

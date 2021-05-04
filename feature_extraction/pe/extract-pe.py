@@ -8,16 +8,15 @@ import pefile
 import sys, os
 import csv
 import pandas as pd
+import datetime
 
 # Folder to analyse
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
 if "malware" in dir_path:
     malware = True
-    print("viruses!")
 elif "benign" in dir_path:
     malware = False
-    print("all good")
 
 # Grab paths of all executables in folder
 file_list = []
@@ -29,9 +28,6 @@ for folder, subfolder, files in os.walk(dir_path):
             # ignore self
             full_path = os.path.join(folder, f)
             file_list.append(full_path)
-print("file list=", file_list)
-
-# todo: split file list into batches to parallise
 
 
 def extract_header(HEADER):
@@ -42,6 +38,15 @@ def extract_header(HEADER):
     for item in header_dict:
         if "Structure" in str(item):
             continue
+        elif item == "TimeDateStamp":
+            string_date = header_dict["TimeDateStamp"]["Value"]
+            parsed_date = string_date[string_date.find("[") + 1 : string_date.find("]")]
+            date_object = datetime.datetime.strptime(
+                parsed_date, "%a %b %d %H:%M:%S %Y %Z"
+            )
+            item_list.append(item)
+            var_list.append(date_object.year)
+            break
         item_list.append(item)
         var_list.append(header_dict[item]["Value"])
     header_dict = dict(zip(item_list, var_list))
@@ -64,8 +69,6 @@ for executable in file_list:
 
     if pe.FILE_HEADER:
         header_dict.update(extract_header(pe.FILE_HEADER))
-
-    # todo: flags variable could cause trouble, add error catching
 
     if pe.DOS_HEADER:
         header_dict.update(extract_header(pe.DOS_HEADER))
@@ -103,16 +106,23 @@ for executable in file_list:
     dataframe_list.append(df.T)
 
 
-# todo: add extraction of imports
-
-
 final_df = pd.concat(dataframe_list)
 final_df = final_df.set_index("SampleName")
 final_df.fillna(0, inplace=True)
 
+# This to stop /n characters causing trouble
+final_df["e_res2"] = final_df["e_res2"].apply(lambda x: x.replace("\r\n", "\\r\\n"))
+
+malware = False
+
 if malware == True:
     final_df["IsMalware"] = 1
-    final_df.to_csv("processed_malware.csv")
+
+    with open("processed_malware.csv", mode="w", newline="\n") as f:
+        final_df.to_csv(f, sep=",", line_terminator=os.linesep, encoding="utf-8")
+
 elif malware == False:
     final_df["IsMalware"] = 0
-    final_df.to_csv("processed_benign.csv")
+
+    with open("processed_benign.csv", mode="w", newline="\n") as f:
+        final_df.to_csv(f, sep=",", line_terminator=os.linesep, encoding="utf-8")

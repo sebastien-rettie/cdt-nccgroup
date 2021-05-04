@@ -1,174 +1,225 @@
 # Compares performance of different feature selection methods
+import pickle
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import pickle
-import matplotlib.pyplot as plt
-from sklearn.datasets import load_digits
-from sklearn.model_selection import GridSearchCV
-from sklearn.pipeline import Pipeline
-from sklearn.decomposition import PCA, NMF
+from sklearn.decomposition import NMF, TruncatedSVD
 from sklearn.feature_selection import (
-    SelectPercentile,
+    SelectFromModel,
     SelectKBest,
     chi2,
     mutual_info_classif,
 )
+from sklearn.model_selection import GridSearchCV, cross_val_score
+from sklearn.pipeline import Pipeline
+from sklearn.tree import DecisionTreeClassifier
 
-from sklearn.feature_selection._base import SelectorMixin
-from sklearn.feature_extraction.text import _VectorizerMixin
-from sklearn.model_selection import KFold, StratifiedKFold
-from sklearn.feature_selection import mutual_info_classif
-from sklearn.tree import DecisionTreeClassifier, export_graphviz
-from sklearn.model_selection import RandomizedSearchCV, GridSearchCV, cross_val_score
-from sklearn.svm import SVC
-from preprocessing import (
-    generate_types,
-    concat_files,
-    preprocess_dataframe,
-    encode_scale,
+from preprocessing import generate_types, get_ct_feature_names
+
+train_file = "train.csv"
+df_train = pd.read_csv(
+    train_file,
+    dtype=generate_types(train_file),
+    engine="python",
 )
+df_train.set_index(["SampleName"], inplace=True)
 
-input_file_2 = "../dataset/benign/benign-exe.csv"
-input_file_3 = "../dataset/malware/00355_malware.csv"
+test_file = "test.csv"
+df_test = pd.read_csv(test_file, dtype=generate_types(test_file), engine="python")
+df_test.set_index(["SampleName"], inplace=True)
 
-list_files = [input_file_2, input_file_3]
+y_train = df_train["IsMalware"]
+X_train = df_train.drop("IsMalware", axis=1)
 
-np.set_printoptions(precision=2)
+y_test = df_test["IsMalware"]
+X_test = df_test.drop("IsMalware", axis=1)
 
-# EITHER concatenate disparate data files
-"""df = concat_files(list_files)
-"""
-# OR if reading from pre-concatenated data
-input_file = "all_data.csv"
-df = pd.read_csv(input_file, dtype=generate_types(input_file))
 
-df = preprocess_dataframe(df)
+with open("encoder.pickle", "rb") as f:
+    column_trans = pickle.load(f, encoding="bytes")
 
-y = df["IsMalware"]
-X = df.drop("IsMalware", axis=1)
-# Note it is bad practice to have split after transform- fix
-X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=4)
+X_train = column_trans.transform(X_train)
+X_test = column_trans.transform(X_test)
 
-# EITHER fit and save encoder
-encoder = encode_scale().fit(X_train)
-with open("encoder.pickle", "wb") as f:
-    pickle.dump(encoder, f)
+with open("selector.pickle", "rb") as f:
+    selector = pickle.load(f, encoding="bytes")
 
-# OR import prefit encoder
-"""with open("encoder.pickle", "rb") as f:
-    encode_scale = pickle.load(f, encoding="bytes")"""
+X_train = selector.transform(X_train)
+X_test = selector.transform(X_test)
 
-X_train = encoder.transform(X_train)
-X_test = encoder.transform(X_test)
+with open("scale.pickle", "rb") as f:
+    scale_transform = pickle.load(f, encoding="bytes")
 
-pipeline = Pipeline(
-    [
-        # the reduce_dim stage is populated by the param_grid
-        ("reduce_dim", "passthrough"),
-        (
-            "classify",
-            DecisionTreeClassifier(
-                random_state=0,
-                splitter="best",
-                min_samples_split=2,
-                min_samples_leaf=2,
+X_train = scale_transform.transform(X_train)
+X_test = scale_transform.transform(X_test)
+
+X_train = X_train.astype("int64")
+X_test = X_test.astype("int64")
+
+GiniFeatures = False
+################# Retrieve Gini feature names
+if GiniFeatures:
+
+    clf = DecisionTreeClassifier(
+        random_state=0,
+        max_depth=8,
+        min_samples_leaf=2,
+        min_samples_split=3,
+        splitter="best",
+    ).fit(X_train, y_train)
+
+    importances = clf.feature_importances_
+    feature_names = get_ct_feature_names(column_trans)
+
+    feature_importances = dict(zip(feature_names, importances))
+    for key in sorted(feature_importances, key=feature_importances.get, reverse=True):
+        if feature_importances[key] > 0.021:
+            print(key, feature_importances[key])
+        else:
+            feature_importances.pop(key)
+    plt.bar(*zip(*feature_importances.items()), align="center")
+    plt.title("DT Feature Importance Gini")
+    plt.show()
+    plt.savefig("DT_gini_importantfeatures.png")
+
+##############################################################
+MethodCompare = False
+
+if MethodCompare:
+    dt = DecisionTreeClassifier(
+        random_state=0,
+        max_depth=5,
+        min_samples_leaf=1,
+        min_samples_split=2,
+        splitter="best",
+    ).fit(X_train, y_train)
+
+    print("DT fitted")
+
+    pipeline = Pipeline(
+        [
+            # the reduce_dim stage is populated by the param_grid
+            ("reduce_dim", "passthrough"),
+            (
+                "classify",
+                DecisionTreeClassifier(
+                    random_state=0,
+                    max_depth=5,
+                    min_samples_leaf=1,
+                    min_samples_split=2,
+                    splitter="best",
+                ),
             ),
-        ),
+        ]
+    )
+
+    N_FEATURES_OPTIONS = [10, 100, 1000]
+    MD_OPTIONS = [3, 5]
+
+    param_grid = [
+        {
+            "reduce_dim": [TruncatedSVD(n_iter=10), NMF(init="nndsvd", max_iter=500)],
+            "reduce_dim__n_components": N_FEATURES_OPTIONS,
+            "classify__max_depth": MD_OPTIONS,
+        },
+        {
+            "reduce_dim": [SelectFromModel(dt, threshold=-np.inf)],
+            "reduce_dim__max_features": N_FEATURES_OPTIONS,
+            "classify__max_depth": MD_OPTIONS,
+        },
+        {
+            "reduce_dim": [SelectKBest(chi2), SelectKBest(mutual_info_classif)],
+            "reduce_dim__k": N_FEATURES_OPTIONS,
+            "classify__max_depth": MD_OPTIONS,
+        },
     ]
-)
 
+    reducer_labels = [
+        "Truncated SVD",
+        "NMF",
+        "Gini",
+        "KBest(chi2)",
+        "KBest(mutual info)",
+    ]
 
-N_FEATURES_OPTIONS = [4, 5]
-MD_OPTIONS = [3, 5]
-# , NMF()
-param_grid = [
-    {
-        "reduce_dim": [PCA(iterated_power=7)],
-        "reduce_dim__n_components": N_FEATURES_OPTIONS,
-        "classify__max_depth": MD_OPTIONS,
-    },
-    {
-        "reduce_dim": [SelectKBest(chi2), SelectKBest(mutual_info_classif)],
-        "reduce_dim__k": N_FEATURES_OPTIONS,
-        "classify__max_depth": MD_OPTIONS,
-    },
-]
-reducer_labels = ["PCA", "KBest(chi2)", "KBest(mutual info)"]
-estimator = DecisionTreeClassifier(
-    random_state=0,
-    splitter="best",
-    min_samples_split=2,
-    min_samples_leaf=2,
-)
-print(estimator.get_params().keys())
+    grid = GridSearchCV(pipeline, n_jobs=1, param_grid=param_grid)
+    grid.fit(X_train, y_train)
 
-grid = GridSearchCV(pipeline, n_jobs=1, param_grid=param_grid)
-grid.fit(X, y)
+    mean_scores = np.array(grid.cv_results_["mean_test_score"])
+    print(mean_scores)
+    # scores are in the order of param_grid iteration, which is alphabetical
+    mean_scores = mean_scores.reshape(len(MD_OPTIONS), -1, len(N_FEATURES_OPTIONS))
+    mean_scores = mean_scores.max(axis=0)
+    bar_offsets = np.arange(len(N_FEATURES_OPTIONS)) * (len(reducer_labels) + 1) + 0.5
 
-mean_scores = np.array(grid.cv_results_["mean_test_score"])
-# scores are in the order of param_grid iteration, which is alphabetical
-mean_scores = mean_scores.reshape(len(MD_OPTIONS), -1, len(N_FEATURES_OPTIONS))
-# select score for best C
-mean_scores = mean_scores.max(axis=0)
-bar_offsets = np.arange(len(N_FEATURES_OPTIONS)) * (len(reducer_labels) + 1) + 0.5
+    plt.figure()
+    COLORS = "bgrcmyk"
+    for i, (label, reducer_scores) in enumerate(zip(reducer_labels, mean_scores)):
+        print(label)
+        print(reducer_scores)
+        plt.bar(bar_offsets + i, reducer_scores, label=label, color=COLORS[i])
 
-plt.figure()
-COLORS = "bgrcmyk"
-for i, (label, reducer_scores) in enumerate(zip(reducer_labels, mean_scores)):
-    plt.bar(bar_offsets + i, reducer_scores, label=label, color=COLORS[i])
+    plt.title("Comparing feature reduction techniques")
+    plt.xlabel("Reduced number of features")
+    plt.xticks(bar_offsets + len(reducer_labels) / 2, N_FEATURES_OPTIONS)
+    plt.ylabel("Classification accuracy")
+    plt.ylim((0.85, 1))
+    plt.legend(loc="lower left")
 
-plt.title("Comparing feature reduction techniques")
-plt.xlabel("Reduced number of features")
-plt.xticks(bar_offsets + len(reducer_labels) / 2, N_FEATURES_OPTIONS)
-plt.ylabel("Classification accuracy")
-plt.ylim((0, 1))
-plt.legend(loc="upper left")
+    plt.show()
+    plt.savefig("feature_selection_method.png")
 
-plt.show()
-plt.savefig("feature_selection_method.png")
-
-# Indicates that chi-squared is best method
+# Indicates that mutual info is best method
 # Then find optimal number of features to use
+######################################################
+FeatureNumber = True
 
-
-clf = Pipeline(
-    [
-        # the reduce_dim stage is populated by the param_grid
-        ("anova", SelectPercentile(chi2)),
-        (
-            "classify",
-            DecisionTreeClassifier(
-                random_state=0,
-                splitter="best",
-                min_samples_split=2,
-                min_samples_leaf=2,
+if FeatureNumber:
+    pipe = Pipeline(
+        [
+            ("anova", SelectKBest(mutual_info_classif)),
+            (
+                "classify",
+                DecisionTreeClassifier(
+                    random_state=0,
+                    splitter="best",
+                    min_samples_split=2,
+                    min_samples_leaf=2,
+                    max_depth=5,
+                ),
             ),
-        ),
-    ]
-)
+        ]
+    )
 
+    # #############################################################################
+    # Plot the cross-validation score as a function of feature number
+    score_means = list()
+    score_stds = list()
 
-# #############################################################################
-# Plot the cross-validation score as a function of feature number
-score_means = list()
-score_stds = list()
+    N_COMPONENTS = (
+        50,
+        100,
+        150,
+        200,
+        250,
+        300,
+        350,
+        400,
+    )
 
-percentiles = (1, 3, 6)
+    for component in N_COMPONENTS:
+        pipe.set_params(anova__k=component)
+        this_scores = cross_val_score(pipe, X_train, y_train)
+        score_means.append(this_scores.mean())
+        score_stds.append(this_scores.std())
 
-for percentile in percentiles:
-    clf.set_params(anova__percentile=percentile)
-    this_scores = cross_val_score(clf, X, y)
-    score_means.append(this_scores.mean())
-    score_stds.append(this_scores.std())
+    plt.errorbar(N_COMPONENTS, score_means, np.array(score_stds))
+    plt.title("Performance of DT/mutualinfo varying the number of features selected")
+    plt.ylim((0.5, 1))
+    plt.xlabel("Feature percentile")
+    plt.ylabel("Accuracy Score")
+    plt.axis("tight")
+    plt.show()
 
-
-plt.errorbar(percentiles, score_means, np.array(score_stds))
-plt.title("Performance of the DT-Anova varying the percentile of features selected")
-plt.xticks(np.linspace(0, 100, 11, endpoint=True))
-plt.xlabel("Percentile")
-plt.ylabel("Accuracy Score")
-plt.axis("tight")
-plt.show()
-
-plt.savefig("feature_selection_num.png")
+    plt.savefig("feature_selection_num.png")

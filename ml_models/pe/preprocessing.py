@@ -2,7 +2,6 @@
 import pandas as pd
 import numpy as np
 
-from sklearn.preprocessing import MaxAbsScaler
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.compose import make_column_selector as selector
@@ -43,6 +42,12 @@ def generate_types(datafile):
         "Name22",
         "Name23",
         "Name24",
+        "Name25",
+        "Name26",
+        "Name27",
+        "Name28",
+        "Name29",
+        "Name30",
         "Name3",
         "Name4",
         "Name5",
@@ -56,44 +61,47 @@ def generate_types(datafile):
     ]
     for column in string_columns:
         dtypes.update({column: "object"})
-    # print(dtypes)
     return dtypes
 
 
-def concat_files(inputfile_list):
+def concat_files(inputfile_list, output_file):
     dataframe_list = []
     # grabs all csvs in list and concats
     for inputfile in inputfile_list:
-        dataframe = pd.read_csv(inputfile, dtype=generate_types(inputfile))
+        dataframe = pd.read_csv(
+            inputfile, engine="python", dtype=generate_types(inputfile)
+        )
         dataframe_list.append(dataframe)
     all_data = pd.concat(dataframe_list, axis=0)
     # writes to all data csv for reuse
-    all_data.to_csv("all_data.csv", index=False)
+    all_data.to_csv(output_file, index=False)
     return all_data
 
 
 def preprocess_dataframe(input_dataframe):
+    """
     input_dataframe = input_dataframe.apply(
-        lambda x: x.fillna(0) if x.dtype.kind in "biufc" else x.fillna("0")
+        lambda x: x.fillna(0) if x.dtype.kind in "biufc" else x.fillna("null")
     )
-    input_dataframe = input_dataframe.drop(columns=["TimeDateStamp", "e_res", "e_res2"])
-    # todo - drops date as makes 1h encoding too big/costly, but would be nice to keep
+    """
+    input_dataframe = input_dataframe.dropna(axis=1)
+    input_dataframe = input_dataframe.drop(columns=["e_res", "e_res2"])
     return input_dataframe
 
 
 def encode_scale():
     # Feature scaling
-    scale_transform = MaxAbsScaler()
+    # scale_transform = MaxAbsScaler()
 
     # One hot encoding, transforms categorical to ML friendly variables
     onehot_transform = OneHotEncoder(handle_unknown="ignore")
 
     column_trans = ColumnTransformer(
         transformers=[
-            ("Numerical", scale_transform, selector(dtype_include="number")),
             ("Categorical", onehot_transform, selector(dtype_include="object")),
+            #       ("Numerical", scale_transform, selector(dtype_include="number")),
         ],
-        #  remainder="passthrough",
+        remainder="passthrough",
     )
     return column_trans
 
@@ -175,3 +183,58 @@ def grid_search_wrapper(
         )
     )
     return grid_search
+
+
+# import files for concatenating
+list_files_train = [
+    "./benign/train/train_benign_dll1.csv",
+    "./benign/train/train_benign_dll2.csv",
+    "./benign/train/train_benign_exe.csv",
+    "./malware/train/train_malware_380.csv",
+    "./malware/train/train_malware_387.csv",
+]
+list_files_test = [
+    "./benign/test/test_benign_dll.csv",
+    "./benign/test/test_benign_exe.csv",
+    "./malware/test/test_malware_352.csv",
+    "./malware/test/test_malware_355.csv",
+    "./malware/test/test_malware_381.csv",
+]
+
+# EITHER concatenate disparate data files (note do not do this with linux cat)
+
+concat_files(list_files_train, "concatenated_train.csv")
+concat_files(list_files_test, "concatenated_test.csv")
+
+# OR if reading from pre-concatenated data
+
+train_file = "concatenated_train.csv"
+df_train = pd.read_csv(
+    train_file,
+    dtype=generate_types(train_file),
+    engine="python",
+)
+df_train.set_index(["SampleName"], inplace=True)
+
+test_file = "concatenated_test.csv"
+df_test = pd.read_csv(test_file, dtype=generate_types(test_file), engine="python")
+df_test.set_index(["SampleName"], inplace=True)
+
+df_train = preprocess_dataframe(df_train)
+df_test = preprocess_dataframe(df_test)
+
+print(df_train.shape)
+print(df_test.shape)
+
+
+df_train = df_train.reindex(columns=df_test.columns)
+print(df_train.shape)
+
+# Fix column typing
+df_train = df_train.astype(df_test.dtypes.to_dict())
+df_train = df_train.apply(
+    lambda x: x.fillna(0) if x.dtype.kind in "biufc" else x.fillna("null")
+)
+
+df_train.to_csv("train.csv")
+df_test.to_csv("test.csv")

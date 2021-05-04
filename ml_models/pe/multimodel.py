@@ -1,154 +1,180 @@
+import csv
+import pickle
+
 import numpy as np
 import pandas as pd
-import csv
-
-from sklearn.preprocessing import MaxAbsScaler
-from sklearn.preprocessing import OneHotEncoder
-from sklearn.compose import ColumnTransformer
-from sklearn.model_selection import train_test_split
-from sklearn.pipeline import Pipeline
-from sklearn.compose import make_column_selector as selector
-
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.neural_network import MLPClassifier
+import matplotlib.pyplot as plt
+import xgboost as xgb
+from sklearn.ensemble import AdaBoostClassifier, RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.svm import SVC
-from sklearn.gaussian_process import GaussianProcessClassifier
-from sklearn.gaussian_process.kernels import RBF
+from sklearn.neural_network import MLPClassifier
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
-from sklearn.naive_bayes import GaussianNB
-from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
-from sklearn import model_selection
+from sklearn.linear_model import SGDClassifier
 
-input_file = "benign/benign-dll.csv"
-input_file_2 = "benign/benign-exe.csv"
-input_file_3 = "malware/00355_malware.csv"
-input_file_4 = "malware/00372_malware.csv"
+from sklearn.metrics import (
+    auc,
+    classification_report,
+    plot_confusion_matrix,
+    roc_curve,
+    plot_roc_curve,
+)
 
+from preprocessing import (
+    generate_types,
+)
 
-def generate_types(datafile):
-    col_names = pd.read_csv(input_file, nrows=0).columns
-    dtypes = {col: "float64" for col in col_names}
-    string_columns = [
-        "Name0",
-        "Name1",
-        "Name10",
-        "Name11",
-        "Name12",
-        "Name13",
-        "Name14",
-        "Name15",
-        "Name16",
-        "Name17",
-        "Name18",
-        "Name19",
-        "Name2",
-        "Name20",
-        "Name21",
-        "Name22",
-        "Name23",
-        "Name24",
-        "Name3",
-        "Name4",
-        "Name5",
-        "Name6",
-        "Name7",
-        "Name8",
-        "Name9",
-        "TimeDateStamp",
-        "e_res",
-        "e_res2",
-    ]
-    for column in string_columns:
-        dtypes.update({column: "object"})
-    # print(dtypes)
-    return dtypes
+train_file = "train.csv"
+df_train = pd.read_csv(
+    train_file,
+    dtype=generate_types(train_file),
+    engine="python",
+)
+df_train.set_index(["SampleName"], inplace=True)
+
+test_file = "test.csv"
+df_test = pd.read_csv(test_file, dtype=generate_types(test_file), engine="python")
+df_test.set_index(["SampleName"], inplace=True)
+
+y_train = df_train["IsMalware"]
+X_train = df_train.drop("IsMalware", axis=1)
+
+y_test = df_test["IsMalware"]
+X_test = df_test.drop("IsMalware", axis=1)
 
 
-df1 = pd.read_csv(input_file, dtype=generate_types(input_file))
-df2 = pd.read_csv(input_file_2, dtype=generate_types(input_file_2))
-df3 = pd.read_csv(input_file_3, dtype=generate_types(input_file_3))
-df4 = pd.read_csv(input_file_4, dtype=generate_types(input_file_4))
+with open("encoder.pickle", "rb") as f:
+    column_trans = pickle.load(f, encoding="bytes")
 
-all_data = pd.concat([df1, df2, df3, df4], axis=0)
-df = all_data.apply(lambda x: x.fillna(0) if x.dtype.kind in "biufc" else x.fillna("0"))
-df = df.drop(columns=["TimeDateStamp"])
+X_train = column_trans.transform(X_train)
+X_test = column_trans.transform(X_test)
 
-y = df["IsMalware"]
-x = df.drop("IsMalware", axis=1)
+with open("selector.pickle", "rb") as f:
+    selector = pickle.load(f, encoding="bytes")
+
+X_train = selector.transform(X_train)
+X_test = selector.transform(X_test)
+
+with open("scale.pickle", "rb") as f:
+    scale_transform = pickle.load(f, encoding="bytes")
+
+X_train = scale_transform.transform(X_train)
+X_test = scale_transform.transform(X_test)
 
 names = [
-    "Nearest Neighbors",
-    "Linear SVM",
-    "RBF SVM",
-    "Decision Tree",
-    "Random Forest",
-    "Neural Net",
+    "NearestNeighbors",
+    "SGDSVM",
+    "DecisionTree",
+    "RandomForest",
+    "XGBoost",
+    "NeuralNet",
     "AdaBoost",
 ]
 
 classifiers = [
-    KNeighborsClassifier(3),
-    SVC(kernel="linear", C=0.025),
-    SVC(gamma=2, C=1),
-    DecisionTreeClassifier(max_depth=5),
-    RandomForestClassifier(max_depth=5, n_estimators=100),
+    KNeighborsClassifier(n_neighbors=3, n_jobs=-1),
+    SGDClassifier(
+        alpha=8.59067138335719e-05,
+        l1_ratio=0.545077154805471,
+        max_iter=6,
+    ),
+    DecisionTreeClassifier(
+        random_state=0,
+        max_depth=5,
+        min_samples_leaf=1,
+        min_samples_split=2,
+        splitter="best",
+    ),
+    RandomForestClassifier(max_depth=3, n_estimators=10, n_jobs=-1),
+    xgb.XGBClassifier(
+        n_estimators=100,
+        colsample_bytree=0.8317,
+        learning_rate=0.3,
+        max_depth=11,
+        min_child_weight=3.0,
+        subsample=0.9099,
+        gamma=0.292,
+        reg_lambda=0.447,
+    ),
     MLPClassifier(alpha=1, max_iter=1000),
     AdaBoostClassifier(),
 ]
 
 
-# Feature scaling
-scale_transform = MaxAbsScaler()
-
-# One hot encoding, transforms categorical to ML friendly variables
-onehot_transform = OneHotEncoder(handle_unknown="ignore")
-
-column_trans = ColumnTransformer(
-    transformers=[
-        ("Numerical", scale_transform, selector(dtype_include="number")),
-        ("Categorical", onehot_transform, selector(dtype_include="object")),
-    ],
-    remainder="passthrough",
-)
-
-preprocess = Pipeline(steps=[("preprocess", column_trans),])
-
-# Preprocessing
-x = preprocess.fit_transform(x)
-# It is bad practice to have split after transform- fix
-
-X_train, X_test, y_train, y_test = train_test_split(
-    x, y, test_size=0.25, random_state=4
-)
-#
+fig, ax = plt.subplots()
 
 results = []
+model_displays = {}
 scoring = "accuracy"
+
 
 for name, model in zip(names, classifiers):
 
+    print("Predicting with", name)
+
+    picklefile = str(name) + ".pickle"
+
     clf = model.fit(X_train, y_train)
+    y_predicted = clf.predict(X_test)
+    print(clf.score(X_train, y_train), clf.score(X_test, y_test))
+    try:
+        y_score = clf.predict_proba(X_test)[:, 1]
+    except:
+        print("clf.predict_proba unavailable")
+        continue
+    print("Roc plot\n")
+    fpr, tpr, auc_thresholds = roc_curve(y_test, y_score)
+    print("Area under ROC curve:", auc(fpr, tpr))  # AUC of ROC
+    plot_roc_curve(fpr, tpr, name)
 
-    print(
-        "Accuracy of",
-        name,
-        "classifier on training set: {:.2f}".format(clf.score(X_train, y_train)),
+    disp = plot_confusion_matrix(
+        clf,
+        X_test,
+        y_test,
+        display_labels=["Benign", "Malware"],
+        cmap=plt.cm.get_cmap("hot"),
     )
-    print(
-        "Accuracy of",
-        name,
-        " classifier on test set: {:.2f}".format(clf.score(X_test, y_test)),
+    disp.ax_.set_title(name + "Confusion Matrix")
+    print(disp.confusion_matrix)
+    plt.savefig(name + "confusion_matrix.png")
+
+    np.set_printoptions(precision=4)
+
+    print("Saving model")
+    with open(picklefile, "wb") as f:
+        pickle.dump(clf, f)
+
+    print("Plotting roc")
+    model_displays[name] = plot_roc_curve(clf, X_test, y_test, ax=ax, name=name)
+
+    report = classification_report(
+        y_test, y_predicted, target_names=["Benign", "Malware"]
     )
-    results.append(clf.score(X_test, y_test))
+    results.append(
+        [name, clf.score(X_train, y_train), clf.score(X_test, y_test), report]
+    )
 
-    names.append(name)
+    print("Classification report:\n", report)
 
+
+plt.figure(1)
+plt.plot([0, 1], [0, 1], "k--")
+for model in results:
+    plt.plot(model[3], model[4], label=model[0])
+plt.xlabel("False positive rate")
+plt.ylabel("True positive rate")
+plt.title("ROC curve")
+plt.legend(loc="best")
+plt.savefig("graphs/all_models_roc_curve.png")
+plt.show()
+
+_ = ax.set_title("ROC curve")
+ax.set_xlim(0, 0.2)
+ax.set_ylim(0.8, 1)
+plt.savefig("graphs/multi_model_roc_curve.png")
 
 accuracy_results = dict(zip(names, results))
 print(accuracy_results)
 
-with open("multi_model_results.csv", "w") as file:
+with open("scaling_multi_model_results.csv", "w") as file:
     w = csv.writer(file)
     w.writerows(accuracy_results.items())

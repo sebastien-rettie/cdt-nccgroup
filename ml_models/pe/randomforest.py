@@ -21,16 +21,10 @@ from sklearn.metrics import (
     roc_auc_score,
     roc_curve,
 )
-from sklearn.model_selection import (
-    GridSearchCV,
-    StratifiedKFold,
-    train_test_split,
-)
 
 from sklearn.tree import export_graphviz, export_text
 
 from plotting import (
-    adjusted_classes,
     plot_calibration_curve,
     plot_learning_curve,
     precision_recall_threshold,
@@ -39,52 +33,57 @@ from plotting import (
     plot_validation_curve,
 )
 from preprocessing import (
-    concat_files,
-    encode_scale,
     generate_types,
     get_ct_feature_names,
-    preprocess_dataframe,
     grid_search_wrapper,
 )
 
-input_file_2 = "../../dataset/benign/benign-exe.csv"
-input_file_3 = "../../dataset/malware/00355_malware.csv"
 
-list_files = [input_file_2, input_file_3]
+train_file = "train.csv"
+df_train = pd.read_csv(
+    train_file,
+    dtype=generate_types(train_file),
+    engine="python",
+)
+df_train.set_index(["SampleName"], inplace=True)
 
-np.set_printoptions(precision=2)
+test_file = "test.csv"
+df_test = pd.read_csv(test_file, dtype=generate_types(test_file), engine="python")
+df_test.set_index(["SampleName"], inplace=True)
 
-# EITHER concatenate disparate data files
-"""
-df = concat_files(list_files)
-"""
-# OR if reading from pre-concatenated data
-input_file = "all_data.csv"
-df = pd.read_csv(input_file, dtype=generate_types(input_file))
 
-df = preprocess_dataframe(df)
+y_train = df_train["IsMalware"]
+X_train = df_train.drop("IsMalware", axis=1)
 
-y = df["IsMalware"]
-X = df.drop("IsMalware", axis=1)
+y_test = df_test["IsMalware"]
+X_test = df_test.drop("IsMalware", axis=1)
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=4)
 
-# EITHER fit and save encoder
-encoder = encode_scale().fit(X_train)
-with open("encoder.pickle", "wb") as f:
-    pickle.dump(encoder, f)
-
-# OR import prefit encoder
-"""with open("encoder.pickle", "rb") as f:
-    encode_scale = pickle.load(f, encoding="bytes")"""
-
+# import prefit encoder
+with open("encoder.pickle", "rb") as f:
+    column_trans = pickle.load(f, encoding="bytes")
+encoder = column_trans
 X_train = encoder.transform(X_train)
 X_test = encoder.transform(X_test)
 
+with open("selector.pickle", "rb") as f:
+    selector = pickle.load(f, encoding="bytes")
+
+X_train = selector.transform(X_train)
+X_test = selector.transform(X_test)
+
+with open("scale.pickle", "rb") as f:
+    scale_transform = pickle.load(f, encoding="bytes")
+
+X_train = scale_transform.transform(X_train)
+X_test = scale_transform.transform(X_test)
+
+print("finished feature selection")
+
 # Switches to enable hyperparameter tuning/plotting
 previously_tuned = False
-plot_validate_params = False
-performance_report = False
+plot_validate_params = True
+performance_report = True
 
 
 clf = RandomForestClassifier(
@@ -98,13 +97,14 @@ clf = RandomForestClassifier(
 
 # Hyperparameter tuning, uses grid search optimise for recall
 # Skip tuning if already have optimal hyperparameters, want highest recall without compromising accuracy
-if previously_tuned == False:
+if not previously_tuned:
     clf = RandomForestClassifier(n_jobs=-1)
     param_grid = {
-        "min_samples_split": [3, 5],
-        "n_estimators": [3, 5],
-        "max_depth": [3, 5],
-        "max_features": [3, 5],
+        "min_samples_split": [0.1, 0.2, 0.3, 4, 5, 10, 15],
+        "n_estimators": [3, 5, 10, 20, 40],
+        "max_depth": [2, 5, 10, 20],
+        "max_features": [3, 5, 10, 20],
+        "min_samples_leaf": [0.2, 2, 10],
     }
 
     scorers = {
@@ -148,7 +148,7 @@ elif plot_validate_params:
     # Optimal params = {'max_depth': 25, 'max_features': 20, 'min_samples_split': 5, 'n_estimators': 300}
 
     # Max depth validation
-    max_depth_range = list(range(1, 4))
+    max_depth_range = list(range(1, 40))
 
     max_depth_name = "max_depth"
 
@@ -192,20 +192,88 @@ elif plot_validate_params:
         "Min sample split RF validation",
     )
 
+    # max_features validation
+    max_features_range = list(range(2, 20))
+
+    max_features_name = "max_features"
+
+    clf = RandomForestClassifier(
+        max_depth=5,
+        min_samples_split=5,
+        n_estimators=5,
+        random_state=0,
+    )
+
+    plot_validation_curve(
+        max_features_name,
+        max_features_range,
+        clf,
+        X_train,
+        y_train,
+        "Max features RF validation",
+    )
+
+    # min_leaf validation
+    samples_leaf_range = list(range(2, 20))
+    for x in range(1, 5):
+        samples_leaf_range.append(x * 0.1)
+    samples_leaf_range.sort()
+
+    samples_leaf_name = "min_samples_leaf"
+
+    clf = RandomForestClassifier(
+        max_depth=5,
+        min_samples_split=5,
+        n_estimators=5,
+        random_state=0,
+    )
+
+    plot_validation_curve(
+        samples_leaf_name,
+        samples_leaf_range,
+        clf,
+        X_train,
+        y_train,
+        "Min leaf RF validation",
+    )
+
+    # n_estimators validation
+    n_estimators_range = list(range(3, 300))
+
+    n_estimators_name = "n_estimators"
+
+    clf = RandomForestClassifier(
+        max_depth=5,
+        min_samples_split=5,
+        max_features=10,
+        random_state=0,
+    )
+
+    plot_validation_curve(
+        n_estimators_name,
+        n_estimators_range,
+        clf,
+        X_train,
+        y_train,
+        "n estimators RF validation",
+    )
+
 
 elif performance_report:
     clf = RandomForestClassifier(
-        max_depth=3,
-        max_features=5,
-        min_samples_split=5,
-        n_estimators=3,
+        max_depth=5,
+        max_features=10,
+        min_samples_split=7,
+        n_estimators=5,
         random_state=0,
     ).fit(X_train, y_train)
 
-    # with optimised parameters
-    # Optimal params = {'max_depth': 25, 'max_features': 20, 'min_samples_split': 5, 'n_estimators': 300}
-
     y_predicted = clf.predict(X_test)
+
+    y_test_array = np.asarray(y_test)
+    misclassified = y_test_array != y_predicted
+
+    print("Misclassified samples:", y_test[misclassified].index)
 
     y_score = clf.predict_proba(X_test)[:, 1]
     print("Area under ROC curve score:")
@@ -264,17 +332,16 @@ elif performance_report:
 
     print("Precision recall plot\n")
     p, r, thresholds = precision_recall_curve(y_test, y_score)
-    # Adjust this down to remove false negatives
+    # Adjust this threshold down to remove false negatives
     precision_recall_threshold(p, r, thresholds, y_score, y_test, 0.30)
     plot_precision_recall_vs_threshold(p, r, thresholds)
 
-    """
-    To use new threshold:
+    # To use new threshold:
+    threshold = 0.30
     predicted_proba = clf.predict_proba(X_test)
-    predicted = (predicted_proba [:,1] >= threshold).astype('int')
+    predicted = (predicted_proba[:, 1] >= threshold).astype("int")
 
     accuracy = accuracy_score(y_test, predicted)
-    """
 
     print("Roc plot\n")
     fpr, tpr, auc_thresholds = roc_curve(y_test, y_score)
@@ -301,4 +368,5 @@ elif performance_report:
     plot_calibration_curve(clf, X_test, y_test)
 
     print("Learning curve")
-    plot_learning_curve(clf, X, y)
+    plot_learning_curve(clf, X_test, y_test)
+    print("score", clf.score(X_test, y_test))

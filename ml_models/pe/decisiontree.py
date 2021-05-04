@@ -1,112 +1,119 @@
 import pickle
 
+import graphviz
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-
-import graphviz
 import pydot
+
+from sklearn.feature_selection import (
+    SelectKBest,
+    mutual_info_classif,
+)
 from sklearn.metrics import (
     classification_report,
     confusion_matrix,
     plot_confusion_matrix,
     roc_auc_score,
-    roc_curve,
 )
 from sklearn.model_selection import (
     RandomizedSearchCV,
-    StratifiedKFold,
-    train_test_split,
 )
+
 from sklearn.tree import DecisionTreeClassifier, export_graphviz, export_text
+from sklearn.preprocessing import StandardScaler
 
 from plotting import (
-    adjusted_classes,
-    plot_calibration_curve,
     plot_learning_curve,
-    plot_precision_recall_vs_threshold,
     plot_validation_curve,
-    precision_recall_threshold,
 )
 from preprocessing import (
-    concat_files,
-    encode_scale,
     generate_types,
     get_ct_feature_names,
     preprocess_dataframe,
+    encode_scale,
 )
 
-# from joblib import parallel_backend
-# todo: implement parallelism
+# Reading in preprocessed data
+train_file = "train.csv"
+df_train = pd.read_csv(
+    train_file,
+    dtype=generate_types(train_file),
+    engine="python",
+)
+df_train.set_index(["SampleName"], inplace=True)
 
+test_file = "test.csv"
+df_test = pd.read_csv(test_file, dtype=generate_types(test_file), engine="python")
+df_test.set_index(["SampleName"], inplace=True)
 
-# Utility function to report best scores
-def report(results, n_top=3):
-    for i in range(1, n_top + 1):
-        candidates = np.flatnonzero(results["rank_test_score"] == i)
-        for candidate in candidates:
-            print("Model with rank: {0}".format(i))
-            print(
-                "Mean validation score: {0:.3f} (std: {1:.3f})".format(
-                    results["mean_test_score"][candidate],
-                    results["std_test_score"][candidate],
-                )
-            )
-            print("Parameters: {0}".format(results["params"][candidate]))
-            print("")
+y_train = df_train["IsMalware"]
+X_train = df_train.drop("IsMalware", axis=1)
 
-
-np.set_printoptions(precision=2)
-
-# EITHER concatenate disparate data files
-"""
-df = concat_files(list_files)
-"""
-# OR if reading from pre-concatenated data
-input_file = "all_data.csv"
-df = pd.read_csv(input_file, index_col="SampleName", dtype=generate_types(input_file))
-
-df = preprocess_dataframe(df)
-
-y = df["IsMalware"]
-X = df.drop("IsMalware", axis=1)
-
-
-X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=4)
+y_test = df_test["IsMalware"]
+X_test = df_test.drop("IsMalware", axis=1)
 
 # EITHER fit and save encoder
-encoder = encode_scale().fit(X_train)
-with open("encoder.pickle", "wb") as f:
-    pickle.dump(encoder, f)
+prefit_encoder = True
+prefit_selector = True
+prefit_scaler = True
 
-# OR import prefit encoder
-"""with open("encoder.pickle", "rb") as f:
-    encode_scale = pickle.load(f, encoding="bytes")"""
+if not prefit_encoder:
+    encoder = encode_scale().fit(X_train)
+    with open("encoder.pickle", "wb") as f:
+        pickle.dump(encoder, f)
+else:
+    # OR import prefit encoder
+    with open("encoder.pickle", "rb") as f:
+        column_trans = pickle.load(f, encoding="bytes")
+        encoder = column_trans
 
 X_train = encoder.transform(X_train)
 X_test = encoder.transform(X_test)
 
-skf = StratifiedKFold(n_splits=6, shuffle=True, random_state=1)
+if not prefit_encoder:
+    selector = SelectKBest(mutual_info_classif, k=300).fit(X_train, y_train)
+    with open("selector.pickle", "wb") as f:
+        pickle.dump(selector, f)
+else:
+    with open("selector.pickle", "rb") as f:
+        selector = pickle.load(f, encoding="bytes")
+
+X_train = selector.transform(X_train)
+X_test = selector.transform(X_test)
+
+if not prefit_scaler:
+    scale_transform = StandardScaler(with_mean=False)
+    scale_transform.fit(X_train)
+    with open("scale.pickle", "wb") as f:
+        pickle.dump(scale_transform, f)
+else:
+    with open("scale.pickle", "rb") as f:
+        scale_transform = pickle.load(f, encoding="bytes")
+
+X_train = scale_transform.transform(X_train)
+X_test = scale_transform.transform(X_test)
+
 
 # Switches to enable tuning/plotting
-previously_tuned = True
-plot_validate_params = False
-performance_report = True
-
+previously_tuned = False
+plot_validate_params = True
+performance_report = False
 
 # Hyperparameter tuning, use randomised over grid search for speed
-if previously_tuned == False:
+if not previously_tuned:
     tuned_parameters = [
         {
-            "splitter": ["best", "random"],
-            "max_depth": [2, 5, 10, 20, 40],
-            "min_samples_split": [0.1, 0.2, 0.3, 4, 5, 10, 15],
-            "min_samples_leaf": [0.2, 2, 10],
+            "splitter": ["best"],
+            "max_depth": [5],
+            "min_samples_split": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 1.0, 2],
+            "min_samples_leaf": [0.1, 0.2, 0.3, 0.4, 0.5, 1, 2, 5, 10, 20],
         },
     ]
 
-    scores = ["precision", "recall"]
-    n_iter_search = 40
+    scores = ["f1", "recall"]
+
+    n_iter_search = 50
 
     for score in scores:
         print("# Tuning hyper-parameters for %s" % score)
@@ -116,6 +123,7 @@ if previously_tuned == False:
             tuned_parameters,
             n_iter=n_iter_search,
             scoring="%s_macro" % score,
+            cv=7,
         )
         # note GridSearch automatically uses StratKFold x-validation
         clf.fit(X_train, y_train)
@@ -140,16 +148,15 @@ if previously_tuned == False:
         print(classification_report(y_true, y_pred))
         print()
 elif plot_validate_params:
-    # Skip tuning if already have optimal hyperparameters, plot validation curves to verify
-    # Optimal params = {'max_depth': 5, 'min_samples_leaf': 2, 'min_samples_split': 2, 'splitter': 'best'}
+    # Plot validation curves to verify hyperparameters for overfit
 
     # Max depth validation
-    max_depth_range = list(range(1, 4))
+    max_depth_range = list(range(1, 40))
 
     max_depth_name = "max_depth"
 
     clf = DecisionTreeClassifier(
-        random_state=0, splitter="random", min_samples_split=2, min_samples_leaf=2
+        random_state=0, splitter="best", min_samples_split=4, min_samples_leaf=2
     )
 
     plot_validation_curve(
@@ -165,7 +172,7 @@ elif plot_validate_params:
     samples_split_name = "min_samples_split"
 
     clf = DecisionTreeClassifier(
-        random_state=0, splitter="best", min_samples_leaf=2, max_depth=5
+        random_state=0, splitter="best", min_samples_leaf=2, max_depth=10
     )
 
     plot_validation_curve(
@@ -177,19 +184,43 @@ elif plot_validate_params:
         "Min samp validation",
     )
 
+    # Min samples leaf validation
+    samples_leaf_range = list(range(2, 20))
+    for x in range(1, 5):
+        samples_leaf_range.append(x * 0.1)
+    samples_leaf_range.sort()
+
+    samples_leaf_name = "min_samples_leaf"
+
+    clf = DecisionTreeClassifier(
+        random_state=0, splitter="best", min_samples_split=4, max_depth=10
+    )
+
+    plot_validation_curve(
+        samples_leaf_name,
+        samples_leaf_range,
+        clf,
+        X_train,
+        y_train,
+        "Min leaf validation",
+    )
+
 elif performance_report:
+
     clf = DecisionTreeClassifier(
         random_state=0,
-        max_depth=10,
-        min_samples_leaf=2,
-        min_samples_split=5,
+        max_depth=5,
+        min_samples_leaf=1,
+        min_samples_split=2,
         splitter="best",
     ).fit(X_train, y_train)
 
+    print("score", clf.score(X_test, y_test))
     y_predicted = clf.predict(X_test)
 
     y_test_array = np.asarray(y_test)
     misclassified = y_test_array != y_predicted
+
     print("Misclassified samples:", y_test[misclassified].index)
 
     y_score = clf.predict_proba(X_test)[:, 1]
@@ -215,20 +246,20 @@ elif performance_report:
     print("Classification report:\n", report)
 
     print("Feature Importances")
+    # Possibly broken by the addition of feature selection
 
     importances = clf.feature_importances_
-    feature_names = get_ct_feature_names(column_trans)
+    feature_names = get_ct_feature_names(encoder)
 
     feature_importances = dict(zip(feature_names, importances))
     for key in sorted(feature_importances, key=feature_importances.get, reverse=True):
         if feature_importances[key] > 0.01:
             print(key, feature_importances[key])
 
-    print("Roc plot\n")
+    print("Printing ROC plot\n")
 
     tn, fp, fn, tp = confusion_matrix(y_test, y_predicted, normalize="true").ravel()
-    print("fp", fp)
-    print("tp", tp)
+
     plt.figure()
     lw = 2
     plt.scatter(
@@ -246,33 +277,34 @@ elif performance_report:
     plt.title("Receiver operating characteristic example")
     plt.legend(loc="lower right")
 
-    plt.savefig("roc_plot.png")
+    plt.savefig("graphs/roc_plot.png")
     plt.show()
-    """
+
     # Create tree diagram
-    tree_structure = export_text(clf, feature_names=get_ct_feature_names(column_trans))
+    tree_structure = export_text(clf, feature_names=get_ct_feature_names(encoder))
     dot_data = export_graphviz(
         clf,
         out_file="decision_tree.dot",
-        feature_names=get_ct_feature_names(column_trans),
+        feature_names=get_ct_feature_names(encoder),
         filled=True,
         rounded=True,
         special_characters=True,
     )
     (graph,) = pydot.graph_from_dot_file("decision_tree.dot")
-    graph.write_png("decision_tree.png")
-    """
+    graph.write_png("graphs/decision_tree.png")
+
     # Print confusion matrix
+    print("Confusion Matrix")
     disp = plot_confusion_matrix(
         clf,
         X_test,
         y_test,
         display_labels=["Benign", "Malware"],
-        cmap=plt.cm.get_cmap("Spectral"),
+        cmap=plt.cm.get_cmap("hot"),
     )
     disp.ax_.set_title("Confusion Matrix")
     print(disp.confusion_matrix)
-    plt.savefig("DT_confusion_matrix.png")
+    plt.savefig("graphs/DT_confusion_matrix.png")
 
     print("Learning curve")
-    plot_learning_curve(clf, X, y)
+    plot_learning_curve(clf, X_train, y_train)
