@@ -1,4 +1,4 @@
-name: ML
+name: ML_PE
 channels:
   - anaconda
   - conda-forge
