@@ -7,6 +7,7 @@ Here are all the scripts I used to recover CFGs and CGs from binaries and constr
 	- the code is probably hard to follow because of all the error handling and conditionals, message me if you want me to try and explain something.
 - `allAPI_categories_techheaders_reduced.yaml`: the categories I ended up using, they are scraped from Microsoft docs. 
 - api_categorisation/: this directory contains all the scripts I used to scrape the documentation and build the API call categories yaml file.
+- `angr_env.yaml`: conda environment required for graph revovery.
 
 ## Workflow:
 ```
