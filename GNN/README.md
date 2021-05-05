@@ -12,6 +12,8 @@ Here is the GNN model and scripts to prepare data for training, do training, and
 - validation_results/: this is where I was analysing the performance on the validation set for hyperparameter tuning and for plots to show the group. the `analyse.py`analyses the training information from `train.py`.
 - final_results/: this is where I analysed the performance of the test set. Included are my saved final models. The `predict.py`gets the predictions of the model on the test set. The analyse scripts then produce plots and stuff. 
 - process_graphs: scripts for processing the graph data. `process_cfg.py` counts all the opcodes to find the most frequent and then resizes the feature matrices to use the most frequent opcodes. It also converts the adjacency matrix into an edge list (I didnt realise the GCN layers took edge lists). The `process_cg.py`only converts adjacency matrix into edge list. `process_processed.py`just moves graphs with <= 5 nodes to a different folder. `get_family.py` uses the metadata files to give graphs malware familiy labels.
+- `pytorch_geo_env.yaml`: conda environment for the GNN. Used in the train and predict scripts.
+- `sklearn_env.yaml`: conda environment for the analyse predictions from the GNN. Used in the analyse scripts.
 
 ## Workflow:
 This is for binary classification but basically the same idea for multiclass (I wish GitHub rendered Mermaid graphs, these would look :ok_hand:).
