@@ -16,11 +16,11 @@ Here is the GNN model and scripts to prepare data for training, do training, and
 ## Workflow:
 This is for binary classification but basically the same idea for multiclass (I wish GitHub rendered Mermaid graphs, these would look :ok_hand:).
 ```
-graphs --> process_cfg/cg.py --> process_processed --> train.py --> saved model --> predict.py --> anaylse_test.py
-                                                        /  ^
-                                                       /    \ 
-                                validation_results/ <--      hyperparameter tuning
-                                         |                            ^
-                                         |                            |
-                                          ----------------------------
+graphs --> process_cfg/cg.py --> process_processed.py --> train.py --> saved model --> predict.py --> anaylse_test.py
+                                                           /  ^
+                                                          /    \ 
+                                   validation_results/ <--      hyperparameter tuning
+                                           |                            ^
+                                           |                            |
+                                            ----------------------------
 ```
