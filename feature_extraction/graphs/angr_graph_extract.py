@@ -471,7 +471,7 @@ def parse_arguments():
 
     parser.add_argument("--cfg", nargs='?', type=str, action="store", dest="OPCODE_CATEGORIES",
                         help="yaml file with opcode categories for feature matrix. If 'none' will give each unique opcode a column \
-                              and save the columns dictionary to JSON. This will create feature matrices of increasing size as new \
+                              and save the column opcode names as a 1d array of strings in the npz. This will create feature matrices of increasing size as new \
                               opcodes are seen so you will need to go over the NPZs and resize the matrices according to desired \
                               opcodes.", default='')
 
