@@ -4,6 +4,8 @@
 
 # Can expand to include function imports
 
+# now with entropy
+
 import pefile
 import sys, os
 import csv
@@ -24,7 +26,7 @@ dataframe_list = []
 
 for folder, subfolder, files in os.walk(dir_path):
     for f in files:
-        if ("extract-pe.py" not in f) and ("test.csv" not in f):
+        if ("extract-pe.py" not in f) and ("processed_benign.csv" not in f):
             # ignore self
             full_path = os.path.join(folder, f)
             file_list.append(full_path)
@@ -79,9 +81,25 @@ for executable in file_list:
     var_list = []
 
     for section in pe.sections:
+
+        entropy = section.get_entropy()
+
+        entropy_key = "Entropy" + str(sect_no)
+        item_list.append(entropy_key)
+        var_list.append(entropy)
+        
+
         section = section.dump_dict()
         for item in section:
             if "Structure" in str(item):
+                continue
+            elif str(item) == "Name":
+                section_name = section[item]["Value"]
+                section_name = section_name.replace('\\x00', '')
+                item_numbered = item + str(sect_no)
+                item_list.append(item_numbered)
+                var_list.append(section_name)
+
                 continue
             item_numbered = item + str(sect_no)
             item_list.append(item_numbered)
@@ -110,8 +128,12 @@ final_df = pd.concat(dataframe_list)
 final_df = final_df.set_index("SampleName")
 final_df.fillna(0, inplace=True)
 
+print(final_df.head(3))
+
 # This to stop /n characters causing trouble
 final_df["e_res2"] = final_df["e_res2"].apply(lambda x: x.replace("\r\n", "\\r\\n"))
+
+# might need to do it across dataframe
 
 malware = False
 
