@@ -130,3 +130,6 @@ dmypy.json
 
 # PDFs
 *.pdf
+
+# Mac files
+.DS_Store
