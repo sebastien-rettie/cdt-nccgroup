@@ -29,7 +29,11 @@ error_list = []
 
 for folder, subfolder, files in os.walk(dir_path):
     for f in files:
-        if ("extract-pe.py" not in f) and ("processed_benign.csv" not in f) and ("error_list.txt" not in f):
+        if (
+            ("extract-pe.py" not in f)
+            and ("processed_benign.csv" not in f)
+            and ("error_list.txt" not in f)
+        ):
             # ignore self
             full_path = os.path.join(folder, f)
             file_list.append(full_path)
@@ -91,7 +95,6 @@ for executable in file_list:
             entropy_key = "Entropy" + str(sect_no)
             item_list.append(entropy_key)
             var_list.append(entropy)
-            
 
             section = section.dump_dict()
             for item in section:
@@ -99,7 +102,7 @@ for executable in file_list:
                     continue
                 elif str(item) == "Name":
                     section_name = section[item]["Value"]
-                    section_name = section_name.replace('\\x00', '')
+                    section_name = section_name.replace("\\x00", "")
                     item_numbered = item + str(sect_no)
                     item_list.append(item_numbered)
                     var_list.append(section_name)
@@ -127,11 +130,11 @@ for executable in file_list:
         df = pd.DataFrame.from_dict(header_dict, orient="index")
         dataframe_list.append(df.T)
     except pefile.PEFormatError as e:
-        print('Parsing error!',e)
+        print("Parsing error!", e)
         head, tail = os.path.split(executable)
         tail = str(tail)
         error_filename = tail.replace(" ", "")
-        print('Adding ',error_filename, 'to error list.')
+        print("Adding ", error_filename, "to error list.")
         error_list.append(error_filename)
 
 
@@ -140,7 +143,7 @@ parsed_files = final_df["SampleName"]
 final_df = final_df.set_index("SampleName")
 
 # XGBoost can handle nans
-#final_df.fillna(0, inplace=True)
+# final_df.fillna(0, inplace=True)
 
 
 # This to stop /n characters causing trouble
@@ -148,7 +151,7 @@ final_df["e_res2"] = final_df["e_res2"].apply(lambda x: x.replace("\r\n", "\\r\\
 # might need to do it across dataframe
 
 if error_list:
-    with open('error_list.txt', 'w') as f:
+    with open("error_list.txt", "w") as f:
         for item in error_list:
             f.write("%s\n" % item)
 
@@ -161,9 +164,10 @@ if malware == True:
         final_df.to_csv(f, sep=",", line_terminator=os.linesep, encoding="utf-8")
 
     with open("parsed_file_list.csv", mode="w", newline="\n") as f:
-        parsed_files.to_csv(f, index=False,sep=",", line_terminator=os.linesep, encoding="utf-8")
+        parsed_files.to_csv(
+            f, index=False, sep=",", line_terminator=os.linesep, encoding="utf-8"
+        )
 
-    
 
 elif malware == False:
     final_df["IsMalware"] = 0
