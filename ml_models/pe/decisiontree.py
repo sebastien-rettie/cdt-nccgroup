@@ -71,7 +71,7 @@ else:
 X_train = encoder.transform(X_train)
 X_test = encoder.transform(X_test)
 
-if not prefit_encoder:
+if not prefit_selector:
     selector = SelectKBest(mutual_info_classif, k=300).fit(X_train, y_train)
     with open("selector.pickle", "wb") as f:
         pickle.dump(selector, f)
