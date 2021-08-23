@@ -1,0 +1,51 @@
+A performance report has been conducted on decisiontree.py! The time taken was 30.132s.
+PLEASE NOTE: Neither a precision-recall plot nor an roc plot was not conducted as the code failed to compile due to input issues. To investigate and debug further, uncomment the line for plotting the precision-recall curve and follow the raised exceptions.
+ A tree diagram could also not be put together as there was an incorrect number of features collected. Whether this is an issue with plotting.py/preprocessing.py's get features function is currently unknown.
+
+Selected Parameters:
+	max_depth: 18
+	max_features: 4
+	min_samples_split: 5
+	n_estimators: 16
+
+The performance report was as follows:
+              precision    recall  f1-score   support
+
+      Benign       0.90      0.98      0.94      3438
+     Malware       0.99      0.95      0.97      7630
+
+    accuracy                           0.96     11068
+   macro avg       0.95      0.97      0.95     11068
+weighted avg       0.96      0.96      0.96     11068
+
+The following feature importances were found:
+	TimeDateStamp_0x19D5673B [Mon Sep 26 09:19:55 1983 UTC]: 0.08850682035193519
+	TimeDateStamp_0x1B698AF1 [Sat Jul 28 22:28:01 1984 UTC]: 0.0835381814813552
+	TimeDateStamp_0x1A90A6E8 [Wed Feb 15 10:05:28 1984 UTC]: 0.03638188510920354
+	TimeDateStamp_0x1E7A5A82 [Sun Mar 16 05:30:42 1986 UTC]: 0.032306684114819746
+	TimeDateStamp_0x1B3E0083 [Mon Jun 25 21:49:55 1984 UTC]: 0.032250735792566564
+	TimeDateStamp_0x1E663C2F [Fri Feb 28 23:15:59 1986 UTC]: 0.029689525407472765
+	TimeDateStamp_0x1AA6A3D9 [Sat Mar  3 02:22:17 1984 UTC]: 0.027357252959897792
+	TimeDateStamp_0x1EDEF46C [Sat May 31 12:54:04 1986 UTC]: 0.022501773619749817
+	TimeDateStamp_0x1640E548 [Sat Oct 31 04:49:12 1981 UTC]: 0.022049964814927547
+	TimeDateStamp_0x1A7C574D [Tue Jan 31 00:20:29 1984 UTC]: 0.02204373944397324
+	TimeDateStamp_0x1D2A198A [Thu Jul  4 04:11:54 1985 UTC]: 0.019732841191393492
+	TimeDateStamp_0x19429B72 [Tue Jun  7 00:59:30 1983 UTC]: 0.01972486548627544
+	TimeDateStamp_0x1FFE741D [Sun Jan  4 14:39:25 1987 UTC]: 0.018530682841718476
+	TimeDateStamp_0x1BADF890 [Tue Sep 18 20:09:52 1984 UTC]: 0.017669880251508164
+	TimeDateStamp_0x1B960BE6 [Fri Aug 31 16:37:58 1984 UTC]: 0.017161148100577152
+	TimeDateStamp_0x1D3EC444 [Fri Jul 19 20:25:40 1985 UTC]: 0.017023257216576358
+	TimeDateStamp_0x1ECB3EED [Fri May 16 14:06:37 1986 UTC]: 0.015627261933938572
+	TimeDateStamp_0x1E13902C [Sat Dec 28 06:16:12 1985 UTC]: 0.014270547129580233
+	TimeDateStamp_0x1F0EAC67 [Sun Jul  6 17:35:35 1986 UTC]: 0.013615405475919027
+	TimeDateStamp_0x1E5EAF75 [Sun Feb 23 05:49:41 1986 UTC]: 0.013506013241932277
+	TimeDateStamp_0x1F63D5C2 [Tue Sep  9 07:54:42 1986 UTC]: 0.0129477677305996
+	TimeDateStamp_0x1E5D4651 [Sat Feb 22 04:08:49 1986 UTC]: 0.012627567041092075
+	TimeDateStamp_0x1ECEF2EB [Mon May 19 09:31:23 1986 UTC]: 0.012564236076954378
+	TimeDateStamp_0x1F41     [Thu Jan  1 02:13:21 1970 UTC]: 0.012369025442000591
+	TimeDateStamp_0x1E12C616 [Fri Dec 27 15:53:58 1985 UTC]: 0.0115465746502364
+	TimeDateStamp_0x1F39D0B8 [Fri Aug  8 10:58:00 1986 UTC]: 0.011078591340485278
+	TimeDateStamp_0x1A691CA7 [Mon Jan 16 10:17:11 1984 UTC]: 0.01098290972879246
+	TimeDateStamp_0x2051     [Thu Jan  1 02:17:53 1970 UTC]: 0.010438571797423196
+
+Finally, the Randomforest classifier score on the test set: 0.9602457535236718.

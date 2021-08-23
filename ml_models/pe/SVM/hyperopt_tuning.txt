@@ -1,0 +1,53 @@
+==========================================
+DATE: 2021-08-19
+
+TEST RUN	
+
+{'C': 7.675060545443286, 'gamma': 17.3481898579285, 'kernel': 0}
+==========================================
+DATE: 2021-08-19
+Training/testing was conducted on 10.0% of the dataset.
+
+Best hyperparameters found:
+	C: 16.244605152265983
+	gamma: 12.687926759038564
+	kernel: 3
+
+These correspond to an accuracy (negative loss) of:0.9011090286432013
+
+Parameter ranges:
+	C: [0, 20]
+	gamma: [0, 20]
+
+Execution time: 11.670660972595215
+==========================================
+DATE: 2021-08-19
+Training/testing was conducted on 10.0% of the dataset.
+
+Best hyperparameters found:
+	C: 3.4553579122449825
+	gamma: 5.623470180576352
+
+These correspond to an accuracy (negative loss) of:0.9524369780882944
+
+Parameter ranges:
+	C: [0.1, 20]
+	gamma: [0.1, 20]
+
+Execution time: 226.337s
+==========================================
+DATE: 2021-08-19
+Training/testing was conducted on 10.0% of the dataset.
+
+Best hyperparameters found:
+	C: 15.15707131111384
+	gamma: 17.23736157607947
+
+These correspond to an accuracy (negative loss) of:0.9476811665309246
+
+Parameter ranges:
+	C: [0.1, 20]
+	gamma: [0.1, 20]
+
+Execution time: 225.595s
+

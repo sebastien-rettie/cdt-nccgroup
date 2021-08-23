@@ -1,0 +1,112 @@
+==========================================
+DATE: 2021-08-20
+A performance report has been conducted on SVM.py!
+
+Selected parameters:
+        C: 3.4553579122449825
+        gamma: 5.623470180576352
+        n_components: 250
+        loss: modified_huber
+        resulting alpha: 0.00116
+
+The performance report was as follows:
+              precision    recall  f1-score   support
+
+      Benign       0.86      0.91      0.88      3438
+     Malware       0.96      0.93      0.95      7630
+
+    accuracy                           0.93     11068
+   macro avg       0.91      0.92      0.92     11068
+weighted avg       0.93      0.93      0.93     11068
+
+
+Finally, the SGD (SVM approximated using Nystroem) score on the test set: 0.926093241778099
+
+COMMENTS:
+	-Execution time was accidentally deleted but is in the range of about 2s.
+	-This model has a high variance in recall and final score.
+	-It implies not enough training is taking place, or perhaps alpha is too large.
+
+==========================================
+DATE: 2021-08-20
+A performance report has been conducted on SVM.py!
+
+Selected parameters:
+	C: 3.4553579122449825
+	gamma: 5.623470180576352
+	n_components: 250
+	loss: modified_huber
+	resulting alpha: 0.00116
+
+The performance report was as follows:
+              precision    recall  f1-score   support
+
+      Benign       0.82      0.94      0.88      3438
+     Malware       0.97      0.91      0.94      7630
+
+    accuracy                           0.92     11068
+   macro avg       0.90      0.93      0.91     11068
+weighted avg       0.93      0.92      0.92     11068
+
+
+Finally, the SGD (SVM approximated using Nystroem) score on the test set: 0.9181423924828334
+
+Execution time: 1.994s
+
+COMMENTS:
+	-Run as a demonstration of the execution time.
+
+==========================================
+DATE: 2021-08-20
+A performance report has been conducted on SVM.py!
+
+Selected parameters:
+	C: 3.4553579122449825
+	gamma: 5.623470180576352
+	n_components: 250
+	loss: modified_huber
+	resulting alpha: 0.00116
+
+The performance report was as follows:
+              precision    recall  f1-score   support
+
+      Benign       0.77      0.96      0.86      3438
+     Malware       0.98      0.87      0.92      7630
+
+    accuracy                           0.90     11068
+   macro avg       0.88      0.92      0.89     11068
+weighted avg       0.92      0.90      0.90     11068
+
+
+Finally, the SGD (SVM approximated using Nystroem) score on the test set: 0.8990784242862305
+
+Execution time: 1.899s
+
+COMMENTS:
+	-Run previous set up as left on git
+
+==========================================
+DATE: 2021-08-20
+A performance report has been conducted on SVM.py!
+
+Selected parameters:
+	C: 3.4553579122449825
+	gamma: 5.623470180576352
+	n_components: 250
+	loss: modified_huber
+	resulting alpha: 0.00116
+
+The performance report was as follows:
+              precision    recall  f1-score   support
+
+      Benign       0.83      0.94      0.88      3438
+     Malware       0.97      0.91      0.94      7630
+
+    accuracy                           0.92     11068
+   macro avg       0.90      0.93      0.91     11068
+weighted avg       0.93      0.92      0.92     11068
+
+
+Finally, the SGD (SVM approximated using Nystroem) score on the test set: 0.9204011564871702
+
+Execution time: 1.660s

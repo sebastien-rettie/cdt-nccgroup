@@ -1,0 +1,22 @@
+
+
+#################################################
+
+2021-08-19
+A performance report has been conducted on decisiontree.py! The time taken was 116.025s.
+
+Selected Parameters:
+	max_depth: 10
+	min_samples_leaf: 2
+	min_samples_split: 2
+
+The performance report was as follows:
+              precision    recall  f1-score   support
+
+      Benign       0.84      0.97      0.90      3438
+     Malware       0.99      0.92      0.95      7630
+
+    accuracy                           0.93     11068
+   macro avg       0.91      0.94      0.93     11068
+weighted avg       0.94      0.93      0.94     11068
+Finally, the Decision Tree score on the test dataset: 0.9348572461149259
