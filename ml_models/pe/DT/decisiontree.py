@@ -159,14 +159,33 @@ if not previously_tuned:
         print()
         y_true, y_pred = y_test, clf.predict(X_test)
         print(classification_report(y_true, y_pred))
+
+        #Save report as variable for txt report
+        report = classification_report(y_true, y_pred)
+
         print()
 
         end_time = time.time() - start_time
 
-        done = open('done.txt', 'x')
-        done = open('done.txt', 'w')
-        done.write('Training complete in decisiontree.py! The time taken was {0:0.3f}s.'.format(end_time))
-        done.write('\n\nHYPERPARAMETER TUNING DATA:\n')
+        try:
+            reader = open('hyperopt_tuning.txt', 'r')
+            prev_text = reader.read()
+            reader.close()
+        except FileNotFoundError:
+            open('hyperopt_tuning.txt', 'x')
+
+        done = open('hyperopt_tuning.txt', 'w')
+
+        try:
+            done.write(prev_text)
+        except:
+            pass
+
+        done.write('\n==========================================')
+        done.write('\nDATE: {0}'.format(date.today()))
+
+        done.write('Hyperparameter optimisation has been carried out in decisiontree.py! The time taken was {0:0.3f}s.'.format(end_time))
+        done.write('\n\nHyperparameter data:\n')
 
         try:
             for i in param_data:
@@ -341,43 +360,43 @@ elif performance_report:
     print("Learning curve")
     plot_learning_curve(clf, X_train, y_train)
 
-end_time = time.time() - start_time
+    end_time = time.time() - start_time
 
-try:
-    reader = open('performance_report.txt', 'r')
-    prev_text = reader.read()
-    reader.close()
-except FileNotFoundError:
-    open('performance_report.txt','x')
+    try:
+        reader = open('performance_report.txt', 'r')
+        prev_text = reader.read()
+        reader.close()
+    except FileNotFoundError:
+        open('performance_report.txt', 'x')
 
-done = open('performance_report.txt', 'w')
+    done = open('performance_report.txt', 'w')
 
-try:
-    done.write(prev_text)
-except:
-    pass
+    try:
+        done.write(prev_text)
+    except:
+        pass
 
-done.write('\n\n#################################################\n\n')
-done.write('{0}\n'.format(date.today()))
+    done.write('\n==========================================')
+    done.write('\nDATE: {0}'.format(date.today()))
 
-done.write('A performance report has been conducted on decisiontree.py! The time taken was {0:0.3f}s.'.format(end_time))
-done.write('\n\nSelected Parameters:\n')
+    done.write('\nA performance report has been conducted on decisiontree.py! The time taken was {0:0.3f}s.'.format(end_time))
+    done.write('\n\nSelected Parameters:\n')
 
-param_data=[('max_depth', 10),('min_samples_leaf', 2),('min_samples_split', 2)]
+    param_data=[('max_depth', 10),('min_samples_leaf', 2),('min_samples_split', 2)]
 
-try:
-    for i in param_data:
-        done.write('\t{0}: {1}\n'.format(i[0], i[1]))
-except:
-    done.write('No parameter data found.')
+    try:
+        for i in param_data:
+            done.write('\t{0}: {1}\n'.format(i[0], i[1]))
+    except:
+        done.write('No parameter data found.')
 
-done.write('\nThe performance report was as follows:\n')
+    done.write('\nThe performance report was as follows:\n')
 
-try:
-    done.write(report)
-except:
-    done.write('No classification report found.')
+    try:
+        done.write(report)
+    except:
+        done.write('No classification report found.')
 
-done.write('Finally, the Decision Tree score on the test dataset: {0}'.format(test_score))
+    done.write('Finally, the Decision Tree score on the test dataset: {0}'.format(test_score))
 
-done.close()
+    done.close()

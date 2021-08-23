@@ -1,5 +1,0 @@
-Training complete in decisiontree.py! The time taken was 2570.869s.
-
-HYPERPARAMETER TUNING DATA:
-	f1 params: {'splitter': 'best', 'min_samples_split': 2, 'min_samples_leaf': 2, 'max_depth': 5}
-	recall params: {'splitter': 'best', 'min_samples_split': 2, 'min_samples_leaf': 2, 'max_depth': 5}

@@ -391,12 +391,27 @@ elif performance_report:
     print("score", clf.score(X_test, y_test))
 
     end_time = time.time() - start_time
-
-    done = open('performance_report.txt', 'x')
-    done = open('performance_report.txt', 'w')
-    done.write('A performance report has been conducted on decisiontree.py! The time taken was {0:0.3f}s.\n'.format(end_time))
     
-    done.write(\n"PLEASE NOTE: Neither a precision-recall plot nor an roc plot was not conducted as the code failed to compile due to input issues. To investigate and debug further, uncomment the line for plotting the precision-recall curve and follow the raised exceptions.\n")
+    try:
+        reader = open('performance_report.txt', 'r')
+        prev_text = reader.read()
+        reader.close()
+    except FileNotFoundError:
+        open('performance_report.txt', 'x')
+
+    done = open('performance_report.txt', 'w')
+
+    try:
+        done.write(prev_text)
+    except:
+        pass
+
+    done.write('\n==========================================')
+    done.write('\nDATE: {0}'.format(date.today()))
+
+    done.write('\nA performance report has been conducted on decisiontree.py! The time taken was {0:0.3f}s.\n'.format(end_time))
+    
+    done.write("\nPLEASE NOTE: Neither a precision-recall plot nor an roc plot was not conducted as the code failed to compile due to input issues. To investigate and debug further, uncomment the line for plotting the precision-recall curve and follow the raised exceptions.\n")
     done.write("\n A tree diagram could also not be put together as there was an incorrect number of features collected. Whether this is an issue with plotting.py/preprocessing.py's get features function is currently unknown.")
 
     done.write('\n\nSelected Parameters:\n')

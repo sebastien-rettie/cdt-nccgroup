@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import time
+from datetime import date
 
 from sklearn.neighbors import KNeighborsClassifier
 
@@ -125,10 +126,24 @@ if performance_report:
 
     end_time = time.time() - start_time
 
-    done = open('performance_report_2.txt', 'x')
-    done = open('performance_report_2.txt', 'w')
-    done.write('A performance report has been conducted on KNN.py! The time taken was {0:0.3f}s.\n'.format(end_time))
+    try:
+        reader = open('performance_report.txt', 'r')
+        prev_text = reader.read()
+        reader.close()
+    except FileNotFoundError:
+        open('performance_report.txt', 'x')
 
+    done = open('performance_report.txt', 'w')
+
+    try:
+        done.write(prev_text)
+    except:
+        pass
+
+    done.write('\n==========================================')
+    done.write('\nDATE: {0}'.format(date.today()))
+
+    done.write('\nA performance report has been conducted on knn.py! The time taken was {0:0.3f}s.'.format(end_time))
     done.write('\n\nSelected Parameters:\n')
 
     param_data=[('n_neighbours', 3),('p', 2)]
