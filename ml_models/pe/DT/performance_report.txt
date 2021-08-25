@@ -1,4 +1,7 @@
-=========================================
+
+
+#################################################
+
 2021-08-19
 A performance report has been conducted on decisiontree.py! The time taken was 116.025s.
 
@@ -17,9 +20,11 @@ The performance report was as follows:
    macro avg       0.91      0.94      0.93     11068
 weighted avg       0.94      0.93      0.94     11068
 Finally, the Decision Tree score on the test dataset: 0.9348572461149259
-==========================================
-DATE: 2021-08-23
-A performance report has been conducted on decisiontree.py! The time taken was 118.665s.
+
+#################################################
+
+2021-08-23
+A performance report has been conducted on decisiontree.py! The time taken was 116.378s.
 
 Selected Parameters:
 	max_depth: 10

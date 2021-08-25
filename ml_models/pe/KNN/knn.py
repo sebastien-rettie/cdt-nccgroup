@@ -72,12 +72,11 @@ X_test = scale_transform.transform(X_test)
 
 # Switches to enable hyperparameter tuning/plotting
 previously_tuned = True
-performance_report = True
+performance_report = False
 alt_tuning = False
-
+fraction_statistics = True
 
 clf = Pipeline([("classifier", KNeighborsClassifier(n_neighbors=3, p=2))])
-
 
 if performance_report:
     start_time = time.time()
@@ -244,3 +243,89 @@ if alt_tuning:
         y_true, y_pred = y_test, clf.predict(X_test)
         print(classification_report(y_true, y_pred))
         print()
+
+elif fraction_statistics:
+    print('Conducting training statistics analysis...')
+    train_file = "train.csv"
+    df_train = pd.read_csv(
+        train_file,
+        dtype=generate_types(train_file),
+        engine="python",
+    )
+    df_train.set_index(["SampleName"], inplace=True)
+
+    params = {
+            'n_neighbors': 3,
+            'p': 2
+    }
+
+    fraction_range = np.arange(0.001,0.011,0.001)
+    fraction_range = np.append(fraction_range, np.arange(0.02,1.02,0.02))
+
+    print(fraction_range)
+
+    misclassified_vals = [] #Append no. misclassified samples for each fraction
+    scores = [] #Test scores for each fraction
+
+    for fraction in fraction_range:
+        print('FRACTION OF TRAINING DATASET: {0}\n'.format(fraction))
+        
+        df_train_frac = df_train.sample(frac=fraction)
+
+        y_train = df_train_frac["IsMalware"]
+        X_train = df_train_frac.drop("IsMalware", axis=1)
+
+        print(np.shape(X_train), '\n')
+        
+        with open("encoder.pickle", "rb") as f:
+            column_trans = pickle.load(f, encoding="bytes")
+            encoder = column_trans
+
+        X_train = encoder.transform(X_train)
+
+        with open("selector.pickle", "rb") as f:
+            selector = pickle.load(f, encoding="bytes")
+
+        X_train = selector.transform(X_train)
+
+        with open("scale.pickle", "rb") as f:
+            scale_transform = pickle.load(f, encoding="bytes")
+
+        X_train = scale_transform.transform(X_train)
+
+        clf = Pipeline([("classifier", KNeighborsClassifier(
+            n_neighbors=params['n_neighbors'], 
+            p=params['p']
+        ))])
+
+        clf.fit(X_train, y_train)
+
+        print("\n\nClassifier score on the test data:", clf.score(X_test, y_test))
+        y_predicted = clf.predict(X_test)
+
+        y_test_array = np.asarray(y_test)
+        misclassified = y_test_array != y_predicted
+
+        print('Misclassified: {0:0.2f}% ({1})'.format(100*len(y_test[misclassified])/len(y_test),len(y_test[misclassified])))
+
+        misclassified_vals.append(100*len(y_test[misclassified])/len(y_test))
+        scores.append(clf.score(X_test, y_test)*100)
+
+    plt.figure()
+    plt.plot(fraction_range,misclassified_vals,'r-',label='% misclassified samples')
+    plt.plot(fraction_range,scores,'g-',label='% Test dataset accuracy')
+    plt.xlabel('Fraction of statistics used for training')
+    plt.ylabel('Percentage (%)')
+    plt.title('K-Nearest Neighbours accuracy using different fractions of data for training')
+    plt.legend(loc='best')
+    plt.grid(True)
+    plt.savefig('graphs/trainingfractions_misclassified_included.png')
+
+    plt.figure(2)
+    plt.plot(fraction_range,scores,'-',label='% Test dataset accuracy')
+    plt.xlabel('Fraction of statistics used for training')
+    plt.ylabel('Percentage (%)')
+    plt.title('K-Nearest Neighbours accuracy using different fractions of data for training')
+    plt.legend(loc='best')
+    plt.grid(True)
+    plt.savefig('graphs/trainingfractions_accuracy.png')

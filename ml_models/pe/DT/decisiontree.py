@@ -56,6 +56,8 @@ df_test.set_index(["SampleName"], inplace=True)
 y_train = df_train["IsMalware"]
 X_train = df_train.drop("IsMalware", axis=1)
 
+print('\nShape of training dataset: {0}\n'.format(np.shape(X_train)))
+
 y_test = df_test["IsMalware"]
 X_test = df_test.drop("IsMalware", axis=1)
 
@@ -107,7 +109,8 @@ X_test = scale_transform.transform(X_test)
 # Switches to enable tuning/plotting
 previously_tuned = True
 plot_validate_params = False
-performance_report = True
+performance_report = False
+fraction_statistics = True  #Examines whether there is enough data in the training set
 
 # Hyperparameter tuning, use randomised over grid search for speed
 if not previously_tuned:
@@ -159,33 +162,14 @@ if not previously_tuned:
         print()
         y_true, y_pred = y_test, clf.predict(X_test)
         print(classification_report(y_true, y_pred))
-
-        #Save report as variable for txt report
-        report = classification_report(y_true, y_pred)
-
         print()
 
         end_time = time.time() - start_time
 
-        try:
-            reader = open('hyperopt_tuning.txt', 'r')
-            prev_text = reader.read()
-            reader.close()
-        except FileNotFoundError:
-            open('hyperopt_tuning.txt', 'x')
-
-        done = open('hyperopt_tuning.txt', 'w')
-
-        try:
-            done.write(prev_text)
-        except:
-            pass
-
-        done.write('\n==========================================')
-        done.write('\nDATE: {0}'.format(date.today()))
-
-        done.write('Hyperparameter optimisation has been carried out in decisiontree.py! The time taken was {0:0.3f}s.'.format(end_time))
-        done.write('\n\nHyperparameter data:\n')
+        done = open('done.txt', 'x')
+        done = open('done.txt', 'w')
+        done.write('Training complete in decisiontree.py! The time taken was {0:0.3f}s.'.format(end_time))
+        done.write('\n\nHYPERPARAMETER TUNING DATA:\n')
 
         try:
             for i in param_data:
@@ -367,7 +351,7 @@ elif performance_report:
         prev_text = reader.read()
         reader.close()
     except FileNotFoundError:
-        open('performance_report.txt', 'x')
+        open('performance_report.txt','x')
 
     done = open('performance_report.txt', 'w')
 
@@ -376,10 +360,10 @@ elif performance_report:
     except:
         pass
 
-    done.write('\n==========================================')
-    done.write('\nDATE: {0}'.format(date.today()))
+    done.write('\n\n#################################################\n\n')
+    done.write('{0}\n'.format(date.today()))
 
-    done.write('\nA performance report has been conducted on decisiontree.py! The time taken was {0:0.3f}s.'.format(end_time))
+    done.write('A performance report has been conducted on decisiontree.py! The time taken was {0:0.3f}s.'.format(end_time))
     done.write('\n\nSelected Parameters:\n')
 
     param_data=[('max_depth', 10),('min_samples_leaf', 2),('min_samples_split', 2)]
@@ -400,3 +384,97 @@ elif performance_report:
     done.write('Finally, the Decision Tree score on the test dataset: {0}'.format(test_score))
 
     done.close()
+
+elif fraction_statistics:
+    print('Conducting training statistics analysis...')
+    
+    #have to re-unpack the data for this
+    train_file = "train.csv"
+    df_train = pd.read_csv(
+        train_file,
+        dtype=generate_types(train_file),
+        engine="python",
+    )
+    df_train.set_index(["SampleName"], inplace=True)
+
+    params = {
+            'random_state': 0,
+            'max_depth': 10,
+            'min_samples_leaf': 2,
+            'min_samples_split': 2,
+            'splitter': 'best'
+     }
+
+    fraction_range = np.arange(0.001,0.011,0.001)
+    fraction_range = np.append(fraction_range, np.arange(0.02,1.02,0.02)) #Train on fractions increasing by 2% up to 100%
+
+    print(fraction_range)
+
+    misclassified_vals = [] #Append no. misclassified samples for each fraction
+    scores = [] #Test scores for each fraction
+
+    for fraction in fraction_range:
+        print('FRACTION OF TRAINING DATASET: {0}\n'.format(fraction))
+
+        df_train_frac = df_train.sample(frac = fraction) #take random sample as fraction of total dataset
+        
+        y_train = df_train_frac["IsMalware"]
+        X_train = df_train_frac.drop("IsMalware", axis=1)
+        
+        print(np.shape(X_train), '\n')
+
+        with open("encoder.pickle", "rb") as f:
+            column_trans = pickle.load(f, encoding="bytes")
+            encoder = column_trans
+
+        X_train = encoder.transform(X_train)
+
+        with open("selector.pickle", "rb") as f:
+            selector = pickle.load(f, encoding="bytes")
+
+        X_train = selector.transform(X_train)
+
+        with open("scale.pickle", "rb") as f:
+            scale_transform = pickle.load(f, encoding="bytes")
+
+        X_train = scale_transform.transform(X_train)
+        
+        clf = DecisionTreeClassifier(
+            random_state = params['random_state'],
+            max_depth = params['max_depth'],
+            min_samples_leaf = params['min_samples_leaf'],
+            min_samples_split = params['min_samples_split'],
+            splitter = params['splitter'],
+        )
+
+        clf.fit(X_train, y_train)
+
+        print("\n\nClassifier score on the test data:", clf.score(X_test, y_test))
+        y_predicted = clf.predict(X_test)
+
+        y_test_array = np.asarray(y_test)
+        misclassified = y_test_array != y_predicted
+        
+        print('Misclassified: {0:0.2f}% ({1})'.format(100*len(y_test[misclassified])/len(y_test),len(y_test[misclassified])))
+
+        misclassified_vals.append(100*len(y_test[misclassified])/len(y_test))
+        scores.append(clf.score(X_test, y_test)*100)
+
+    plt.figure()
+    plt.plot(fraction_range,misclassified_vals,'r-',label='% misclassified samples')
+    plt.plot(fraction_range,scores,'g-',label='% Test dataset accuracy')
+    plt.xlabel('Fraction of statistics used for training')
+    plt.ylabel('Percentage (%)')
+    plt.title('Decision tree accuracy using different fractions of data for training')
+    plt.legend(loc='best')
+    plt.grid(True)
+    plt.savefig('graphs/trainingfractions_misclassified_included.png')
+
+    plt.figure(2)
+    plt.plot(fraction_range,scores,'-',label='% Test dataset accuracy')
+    plt.xlabel('Fraction of statistics used for training')
+    plt.ylabel('Percentage (%)')
+    plt.title('Decision tree accuracy using different fractions of data for training')
+    plt.legend(loc='best')
+    plt.grid(True)
+    plt.savefig('graphs/trainingfractions_accuracy.png')
