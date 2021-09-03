@@ -61,6 +61,7 @@ print('\nShape of training dataset: {0}\n'.format(np.shape(X_train)))
 y_test = df_test["IsMalware"]
 X_test = df_test.drop("IsMalware", axis=1)
 
+
 # EITHER fit and save encoder
 prefit_encoder = True
 prefit_selector = True
@@ -110,7 +111,7 @@ X_test = scale_transform.transform(X_test)
 previously_tuned = True
 plot_validate_params = False
 performance_report = False
-fraction_statistics = True  #Examines whether there is enough data in the training set
+fraction_statistics = False  #Examines whether there is enough data in the training set
 
 # Hyperparameter tuning, use randomised over grid search for speed
 if not previously_tuned:
