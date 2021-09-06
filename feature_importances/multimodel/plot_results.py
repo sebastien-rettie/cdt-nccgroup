@@ -12,6 +12,9 @@ names = [
     "AdaBoost",
 ]
 
+time_averages = []
+time_stds = []
+
 for name in names:
     print('\n#############################')
     print("MODEL: {0}".format(name))
@@ -31,7 +34,8 @@ for name in names:
             'Accuracy': df_accuracy,
             'Precision': df_precision,
             'Recall': df_recall,
-            'f1': df_f1
+            'f1': df_f1,
+            'Time': df_time
     }
 
     for key in data_map.keys():
@@ -55,26 +59,55 @@ for name in names:
     
         print("Top 10 feature importances:")
 
-        current_feature_names = [] #For plotting purposes
-        plot_data = []
+        top_feature_names = [] #For plotting purposes
+        top_plot_data = []
+        bottom_feature_names = []
+        bottom_plot_data = []
 
         for i in final[:10]:
             print('{0}: {1}'.format(feature_list[i[0]], i[1]))
-            current_feature_names.append(feature_list[i[0]])
-            plot_data.append(i[1])
+            top_feature_names.append(feature_list[i[0]])
+            top_plot_data.append(i[1])
 
         print("\n10 least important features (possible hindrances):")
 
         for i in final[-10:]:
             print('{0}: {1}'.format(feature_list[i[0]], i[1]))
+            bottom_feature_names.append(feature_list[i[0]])
+            bottom_plot_data.append(i[1])
 
-        plt.figure()
+        ### Top features ###
+
+        plt.figure(num='{0}{1}top'.format(name,key))
         plt.xlabel('Feature Name')
-        plt.ylabel('Model {0} reduction from removal'.format(key))
+
+        if key != 'Time': #All metrics except time
+            plt.ylabel('Model {0} % reduction from removal'.format(key))
+            plt.bar(np.arange(1,11,1), 100*np.array(top_plot_data), tick_label=top_feature_names)
+        else: #if time is metric, don't multiply data by 100 (not %), add units in axis
+            plt.ylabel('Model training time reduction from removal (s)')
+            plt.bar(np.arange(1,11,1), np.array(top_plot_data), tick_label=top_feature_names)
+
         plt.title('{0} top 10 feature importances - {1} metric'.format(name, key))
-        plt.bar(np.arange(1,11,1), plot_data, tick_label=current_feature_names)
         plt.xticks(fontsize=10, rotation='vertical')
         plt.savefig('{0}_graphs/{1}_top10.png'.format(name,key))
+
+        ### Bottom features ###
+
+        plt.figure(num='{0}{1}bottom'.format(name,key))
+        plt.xlabel('Feature Name')
+        plt.ylabel('Model {0} % reduction from removal'.format(key))
+
+        if key != 'Time': #All metrics except time
+            plt.ylabel('Model {0} % reduction from removal'.format(key))
+            plt.bar(np.arange(1,11,1), 100*np.array(bottom_plot_data), tick_label=bottom_feature_names)
+        else: #if time is metric, don't multiply data by 100 (not %), add units in axis
+            plt.ylabel('Model training time reduction from removal (s)')
+            plt.bar(np.arange(1,11,1), np.array(bottom_plot_data), tick_label=bottom_feature_names)
+
+        plt.title('{0} bottom 10 feature importances - {1} metric'.format(name, key))
+        plt.xticks(fontsize=10, rotation='vertical')
+        plt.savefig('{0}_graphs/{1}_bottom10.png'.format(name,key))
 
     if name != names[-1]:
         print('\n\nThe next model is ready to show.')
