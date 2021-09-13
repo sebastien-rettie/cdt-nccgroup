@@ -1,0 +1,12 @@
+MODEL: XGBoost
+=====================================
+
+['ImageBase', 'Subsystem']
+
+['MajorSubsystemVersion', 'SizeOfStackReserve']
+
+['SizeOfHeapReserve', 'e_cblp']
+
+['Magic', 'Characteristics0']
+
+['MajorOperatingSystemVersion', 'DllCharacteristics']

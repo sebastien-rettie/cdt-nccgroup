@@ -1,0 +1,12 @@
+MODEL: DecisionTree
+=====================================
+
+['ImageBase', 'Subsystem']
+
+['CheckSum', 'Misc_VirtualSize2']
+
+['SizeOfStackReserve', 'Characteristics0']
+
+['Misc_PhysicalAddress1', 'BaseOfData']
+
+['MajorSubsystemVersion', 'Characteristics2']

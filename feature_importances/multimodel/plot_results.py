@@ -90,6 +90,7 @@ for name in names:
 
         plt.title('{0} top 10 feature importances - {1} metric'.format(name, key))
         plt.xticks(fontsize=10, rotation='vertical')
+        plt.tight_layout()
         plt.savefig('{0}_graphs/{1}_top10.png'.format(name,key))
 
         ### Bottom features ###
@@ -107,6 +108,7 @@ for name in names:
 
         plt.title('{0} bottom 10 feature importances - {1} metric'.format(name, key))
         plt.xticks(fontsize=10, rotation='vertical')
+        plt.tight_layout()
         plt.savefig('{0}_graphs/{1}_bottom10.png'.format(name,key))
 
     if name != names[-1]:

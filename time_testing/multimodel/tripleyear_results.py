@@ -68,9 +68,9 @@ ypoints = poly(xpoints)                          #y value array using poly1d
 #######################################
 
 plt.figure(1)
-plt.xlabel("Datestamp end-year of triple-year training files")
+plt.xlabel("Number of training files")
 plt.ylabel("Model Accuracy")
-plt.title("Various model accuracy on 2019-21 test files trained on\ntriple-year (consecutive) datasets from 1999-2018")
+plt.title("Testing accuracy achieved by differently sized\ntriple-year (consecutive) datasets from 1999-2018")
 plt.grid(True)
 
 for d in datasets:

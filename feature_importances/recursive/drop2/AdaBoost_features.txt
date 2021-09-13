@@ -1,0 +1,12 @@
+MODEL: AdaBoost
+=====================================
+
+['AddressOfEntryPoint', 'CheckSum']
+
+['MajorLinkerVersion', 'SizeOfStackReserve']
+
+['Misc_VirtualSize1', 'Misc_VirtualSize2']
+
+['MinorLinkerVersion', 'SizeOfImage']
+
+['ImageBase', 'PointerToRawData2']

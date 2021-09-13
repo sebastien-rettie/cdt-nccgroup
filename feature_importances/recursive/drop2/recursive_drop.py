@@ -133,6 +133,8 @@ for name in names:
 
     index = 0
 
+    total_used_features = []
+
     while len(dropped_features) != len_droppable:
         X_train_dropped = X_train.drop(dropped_features, axis=1) #Drop least important features so far
         X_test_dropped = X_test.drop(dropped_features, axis=1)
@@ -162,6 +164,12 @@ for name in names:
         df_results[3,index] = rec
         df_results[4,index] = f1
         df_results[5,index] = end_time
+        
+        used_features = ""
+        for feature in feature_list:
+            used_features += "{0}/".format(feature)
+
+        total_used_features.append(used_features)
 
         #Find 2 least important features
         imp_results = []
@@ -181,4 +189,9 @@ for name in names:
         index += 1
 
     #Write model results to CSV
-    pd.DataFrame(df_results).to_csv('{0}_results.csv'.format(name), header=None, index=None)
+    res = pd.DataFrame(df_results)
+    total_used_features = np.reshape(total_used_features, (1,124))
+    used = pd.DataFrame(total_used_features, index=[6])
+    res = res.append(used)
+
+    res.to_csv('{0}_results.csv'.format(name), header=None, index=None)
