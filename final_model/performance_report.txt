@@ -1,0 +1,65 @@
+
+
+===============================================
+
+2021-09-14
+A performance report has been conducted using the XGBoost model. The time taken was 23.528s.
+
+Selected Parameters:
+	n_estimators: 100
+	colsample_bytree: 0.8317
+	learning_rate: 0.3
+	max_depth: 11
+	min_child_weight: 3.0
+	subsample: 0.9099
+	gamma: 0.292
+	reg_lambda: 0.447
+
+USER INPUT PARAMS:
+	Malware fraction in data balance: 0.85
+	Fraction of training data used (downample fraction): 0.2
+
+The performance report was as follows:
+              precision    recall  f1-score   support
+
+      Benign       0.97      0.92      0.94      3438
+     Malware       0.96      0.99      0.98      7630
+
+    accuracy                           0.97     11068
+   macro avg       0.97      0.95      0.96     11068
+weighted avg       0.97      0.97      0.97     11068
+
+
+Finally, the XGBoost score on the test dataset: 0.9658474882544271
+
+===============================================
+
+2021-09-14
+A performance report has been conducted using the XGBoost model. The time taken was 23.822s.
+
+Selected Parameters:
+	n_estimators: 100
+	colsample_bytree: 0.8317
+	learning_rate: 0.3
+	max_depth: 11
+	min_child_weight: 3.0
+	subsample: 0.9099
+	gamma: 0.292
+	reg_lambda: 0.447
+
+USER INPUT PARAMS:
+	Malware fraction in data balance: 0.85
+	Fraction of training data used (downample fraction): 0.2
+
+The performance report was as follows:
+              precision    recall  f1-score   support
+
+      Benign       0.97      0.92      0.95      3438
+     Malware       0.97      0.99      0.98      7630
+
+    accuracy                           0.97     11068
+   macro avg       0.97      0.96      0.96     11068
+weighted avg       0.97      0.97      0.97     11068
+
+
+Finally, the XGBoost score on the test dataset: 0.967925551138417
