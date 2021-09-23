@@ -14,10 +14,9 @@ fractions = [0.25,0.5,0.75]
 
 for i in range(1,5):
     fraction_index = 0
-    
-    plt.figure()
 
     for frac in fractions:
+        plt.figure()
         plt.plot(100*data[:,0], data[:,(5*fraction_index)+i], label="Test dataset: {0}% malware".format(100*frac))
         plt.title('XGBoost {0} from model trained on various balanced data,\ntested on data balanced to 25/50/75% malware'.format(datamap[i],100*frac))
         plt.xlabel('Training dataset malware balance (%)')

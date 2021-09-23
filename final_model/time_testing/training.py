@@ -98,7 +98,7 @@ for year in year_range:
     year_frames = [] #add csvs to list here
 
     for i in np.arange(start_year,year+1,1): #Read in from 2000 to current year
-        train_file = "../csvs/{0}.csv".format(i)
+        train_file = "../../time_testing/csvs/{0}.csv".format(i)
         df = pd.read_csv(
                 train_file,
                 dtype=generate_types(train_file),
@@ -116,7 +116,7 @@ for year in year_range:
     print('This is {0:0.2f}% of the total data.\n'.format(100*np.shape(df_train)[0]/full_size))
 
     # Reading in test data - THIS IS MIXED WITH ALL DIFFERENT YEARS
-    test_file = "../2019-21_test.csv"
+    test_file = "../../time_testing/2019-21_test.csv"
     df_test = pd.read_csv(
             test_file,
             dtype=generate_types(test_file),

@@ -43,6 +43,8 @@ from sklearn.metrics import (
     confusion_matrix,
     plot_confusion_matrix,
     roc_auc_score,
+    plot_roc_curve,
+    roc_curve
 )
 
 from plotting import (
@@ -59,6 +61,7 @@ from preprocessing import (
 import time
 import sys
 from datetime import date
+import seaborn as sns
 
 ###########################################
 
@@ -190,6 +193,10 @@ df_test = pd.read_csv(
 
 df_test.set_index(["SampleName"], inplace=True)
 
+#Copy the dataframes for the 'old' XGBoost which is not trimmed
+df_train_old = df_train
+df_test_old = df_test
+
 
 
 #Load in important features and select those from each dataset
@@ -205,8 +212,7 @@ important_features.append('IsMalware') #Don't let it remove the malware classifi
 print("\nThe top {0} features you have chosen to include are:\n".format(len(important_features)-1))
 print(important_features)
 
-
-#Actually drop all columns using 'sort_importances()'
+#Sort through importances to retain only top features
 df_train = sort_importances(df_train, important_features)
 df_test = sort_importances(df_test, important_features)
 
@@ -238,60 +244,114 @@ X_test = df_test.drop("IsMalware", axis=1)
 X_train = encode_types(X_train)
 X_test = encode_types(X_test)
 
+#Sort and pickle the old dataframes
+y_train_old = df_train_old["IsMalware"]
+X_train_old = df_train_old.drop("IsMalware", axis=1)
+
+y_test_old = df_test_old["IsMalware"]
+X_test_old = df_test_old.drop("IsMalware", axis=1)
+
+# OR import prefit encoder
+with open("encoder.pickle", "rb") as f:
+    column_trans = pickle.load(f, encoding="bytes")
+    encoder = column_trans
+
+X_train_old = encoder.transform(X_train_old)
+X_test_old = encoder.transform(X_test_old)
+
+with open("selector.pickle", "rb") as f:
+    selector = pickle.load(f, encoding="bytes")
+
+X_train_old = selector.transform(X_train_old)
+X_test_old = selector.transform(X_test_old)
+
+with open("scale.pickle", "rb") as f:
+    scale_transform = pickle.load(f, encoding="bytes")
+
+X_train_old = scale_transform.transform(X_train_old)
+X_test_old = scale_transform.transform(X_test_old)
 
 
-#Train the model!
-start_time = time.time()
-
-clf.fit(X_train, y_train)
-y_predicted = clf.predict(X_test)
-
-print("score", clf.score(X_test, y_test))
-
-y_test_array = np.asarray(y_test)
-misclassified = y_test_array != y_predicted
-
-print("Misclassified samples:", y_test[misclassified].index)
-
-y_score = clf.predict_proba(X_test)[:, 1]
-
-print("Area under ROC curve score:")
-print(roc_auc_score(y_test, y_score))
-
-print("Accuracy of classifier on training set: {:.3f}".format(clf.score(X_train, y_train)))
-print("Accuracy of classifier on test set: {:.3f}".format(clf.score(X_test, y_test)))
-
-test_score = clf.score(X_test, y_test)
-
-report = classification_report(y_test, y_predicted, target_names=["Benign", "Malware"])
-
-print("Classification report:\n", report)
 
 
-print("Printing ROC plot\n")
+#Train the models!
+models = ["Original XGBoost", "Simplified XGBoost"]
 
-tn, fp, fn, tp = confusion_matrix(y_test, y_predicted, normalize="true").ravel()
+datasets = {
+        "Original XGBoost": [X_train_old, X_test_old, y_train_old, y_test_old],
+        "Simplified XGBoost": [X_train, X_test, y_train, y_test]
+}
 
-plt.figure()
-lw = 2
-plt.scatter(
-    fp,
-    tp,
-    color="darkorange",
-    lw=lw,
-    label="XGBoost classifier",
+displays = {}
+
+fig, ax = plt.subplots()
+
+for m in models:
+    start_time = time.time()
+
+    clf.fit(datasets[m][0], datasets[m][2])
+    y_predicted = clf.predict(datasets[m][1])
+
+    print("score", clf.score(datasets[m][1], datasets[m][3]))
+
+    y_test_array = np.asarray(datasets[m][3])
+    misclassified = y_test_array != y_predicted
+
+    print("Misclassified samples:", datasets[m][3][misclassified].index)
+
+    y_score = clf.predict_proba(datasets[m][1])[:, 1]
+
+    print("Area under ROC curve score:")
+    print(roc_auc_score(datasets[m][3], y_score))
+
+
+
+    print("Accuracy of classifier on training set: {:.3f}".format(clf.score(datasets[m][0], datasets[m][2])))
+    print("Accuracy of classifier on test set: {:.3f}".format(clf.score(datasets[m][1], datasets[m][3])))
+
+    test_score = clf.score(datasets[m][1], datasets[m][3])
+
+    report = classification_report(datasets[m][3], y_predicted, target_names=["Benign", "Malware"])
+
+    end_time = time.time() - start_time
+
+    print("Classification report:\n", report)
+
+
+    print("Printing ROC plot\n")
+    displays[m] = plot_roc_curve(clf, datasets[m][1], datasets[m][3], ax=ax, name=m)
+    tn, fp, fn, tp = confusion_matrix(datasets[m][3], y_predicted, normalize="true").ravel()
+
+    """lw = 2
+    plt.scatter(
+        fp,
+        tp,
+        color="darkorange",
+        lw=lw,
+        label=m,
 )
-plt.plot([0, 1], [0, 1], color="navy", lw=lw, linestyle="--", label="random guess")
-plt.xlim([0.0, 1.0])
-plt.ylim([0.0, 1.05])
-plt.xlabel("False Positives")
-plt.ylabel("True Positives")
-plt.title("Final XGBoost ROC Curve")
-plt.legend(loc="lower right")
+    plt.plot([0, 1], [0, 1], color="navy", lw=lw, linestyle="--", label="random guess")
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel("False Positives")
+    plt.ylabel("True Positives")
+    plt.title("Final XGBoost ROC Curve")
+    plt.legend(loc="lower right")
 
-plt.savefig("graphs/roc_plot.png")
-plt.show()
+    plt.savefig("graphs/roc_plot.png")
+    plt.show()"""
 
+    plt.xlabel("False positive rate")
+    plt.ylabel("True positive rate")
+    plt.title("Original vs. Simplified XGBoost\nROC curve comparison")
+    plt.legend(loc="best")
+    plt.show()
+
+    _ = ax.set_title("Original vs. Simplified XGBoost\nROC curve comparison")
+    ax.set_xlim(0, 0.2)
+    ax.set_ylim(0.8, 1)
+    
+plt.savefig("graphs/roc_curve_comparison.png")
 
 # Print confusion matrix
 print("Confusion Matrix")
@@ -304,13 +364,24 @@ disp = plot_confusion_matrix(
 )
 disp.ax_.set_title("Final XGBoost Confusion Matrix")
 print(disp.confusion_matrix)
+
+plt.figure()
+plt.title('Final Simplified XGBoost Confusion Matrix, normalized')
+plt.xlabel('Predicted label')
+plt.ylabel('True label')
+group_names = ['True Neg', 'False Pos', 'False Neg', 'True Pos']
+group_counts = ["{0:0.1f}%".format(value) for value in 100*disp.confusion_matrix.flatten()/np.sum(disp.confusion_matrix)]
+group_numbers = ["{0:0.0f}".format(value) for value in disp.confusion_matrix.flatten()] 
+labels = [f"{v1}\n{v2}\nTotal files: {v3}" for v1, v2, v3 in zip(group_names,group_counts,group_numbers)]
+labels = np.asarray(labels).reshape(2,2)
+sns.heatmap(disp.confusion_matrix, annot=labels, fmt='', cmap='hot')
+
 plt.savefig("graphs/confusion_matrix.png")
 
 print("Learning curve")
 plot_learning_curve(clf, X_train, y_train)
 
-end_time = time.time() - start_time
-
+"""
 try:
     reader = open('performance_report.txt', 'r')
     prev_text = reader.read()
@@ -328,7 +399,8 @@ except:
 done.write('\n\n===============================================\n\n')
 done.write('{0}\n'.format(date.today()))
 
-done.write('A performance report has been conducted using the XGBoost model. The time taken was {0:0.3f}s.'.format(end_time))
+done.write('A performance report has been conducted using the XGBoost model. The time taken to train and test it was {0:0.3f}s.'.format(end_time))
+
 done.write('\n\nSelected Parameters:\n')
 
 param_data=[
@@ -361,4 +433,4 @@ except:
 
 done.write('\n\nFinally, the XGBoost score on the test dataset: {0}'.format(test_score))
 
-done.close()
+done.close()"""
