@@ -82,10 +82,47 @@ def balance_and_downsample(data, dataset_fraction, malware_balance):
     mal = data[data["IsMalware"] == '1.0']
     ben = data[data["IsMalware"] == '0.0']
 
-    df_benign = ben.sample(n=round(benign_balance*desired_amount))
-    df_malware = mal.sample(n=round(malware_balance*desired_amount))
+    try:
+        df_benign = ben.sample(n=round(benign_balance*desired_amount))
+        df_malware = mal.sample(n=round(malware_balance*desired_amount))
+        data = pd.concat([df_benign, df_malware])
+    except ValueError:
+        print("Can't balance this dataset using {0} of the statistics, will run this value down until it works using as many statistics as possible...")
+        data = balance_full_dataset(data, malware_balance)
 
-    data = pd.concat([df_benign, df_malware])
+    return data
+
+
+def balance_full_dataset(data, malware_fraction):
+    """
+    Samples the dataset such that the malware/benignware balance is built according to the given fraction
+
+    - data: Dataset to balance
+    - malware_fraction: Fraction of Malware desired in the dataset balance
+
+    Returns 'data', balanced dataset
+    """
+
+    benign_fraction = 1-malware_fraction
+    mal = data[data["IsMalware"] == '1.0']
+    ben = data[data["IsMalware"] == '0.0']
+    mal_amount = mal.shape[0]
+    ben_amount = ben.shape[0]
+    balance = mal_amount/(mal_amount+ben_amount)
+
+    print('Current dataset balance: {0:0.0f}% malware'.format(100*balance))
+
+    if balance < malware_fraction:
+        print('Sampling benignware set...')
+        number = benign_fraction/malware_fraction
+        ben = ben.sample(n=round(number*mal_amount))
+
+    elif balance > malware_fraction:
+        print('Sampling malware set...')
+        number = malware_fraction/benign_fraction
+        mal = mal.sample(n=round(number*ben_amount))
+
+    data = pd.concat([ben, mal])
 
     return data
 
@@ -126,7 +163,7 @@ train_fraction = 0.2
 malware_fraction = 0.85
 
 #FOR USER DEFINED DATASET SHAPING
-user_inputs = False
+user_inputs = True
 
 if user_inputs:
     train_fraction = input('\n\nPlease select a fraction of the dataset you would like to use for training. For example, putting in 0.2 will use 20% of the available statistics: ')
@@ -145,7 +182,7 @@ if user_inputs:
             break
 
 
-    malware_fraction = input('\n\nPlease insert a balance fraction for the dataset. This will be the fraction of the training set that comprises malware. For example, 0.25 will generate a set that is 25% malware, 75% benignware: ')
+    malware_fraction = input('\n\nPlease insert a balance fraction for the dataset. This will be the fraction of the training set that comprises malware. For example, 0.25 will generate a set that is 25% malware, 75% benignware. Enter "none" if you don\'t wish to apply a balance: ')
 
     holding = True
     while holding:
@@ -153,12 +190,16 @@ if user_inputs:
             malware_fraction = float(malware_fraction)
             holding = False
         except:
-            malware_fraction = input('You didn\'t put in a number. Please try again: ')
+            if malware_fraction == "none":
+                holding = False
+            else:
+                malware_fraction = input('You didn\'t put in a number. Please try again: ')
 
-    while malware_fraction > 1:
-        malware_fraction = float(input('Please choose a number lower than 1 (it must be a fraction): '))
-        if malware_fraction < 1:
-            break
+    if malware_fraction != "none":
+        while malware_fraction > 1:
+            malware_fraction = float(input('Please choose a number lower than 1 (it must be a fraction): '))
+            if malware_fraction < 1:
+                break
 
 
 clf = xgb.XGBClassifier(
@@ -219,7 +260,12 @@ df_test = sort_importances(df_test, important_features)
 
 
 #Downsample and balance the training dataset
-df_train = balance_and_downsample(df_train, train_fraction, malware_fraction)
+if malware_fraction != "none":
+    df_train = balance_and_downsample(df_train, train_fraction, malware_fraction)
+else:
+    downsample_mal = df_train.loc[df_train["IsMalware"] == "1.0"].sample(frac=train_fraction)
+    downsample_ben = df_train.loc[df_train["IsMalware"] == "0.0"].sample(frac=train_fraction)
+    df_train = pd.concat([downsample_ben, downsample_mal])
 
 print("\nTraining set counts:")
 print(df_train["IsMalware"].value_counts())
@@ -228,7 +274,6 @@ print('\nDataset shape (to check - IsMalware column not yet dropped):')
 print(df_train.shape)
 
 print('This is {0:0.2f}% of the total data.\n'.format(100*np.shape(df_train)[0]/full_train_size))
-
 
 #Print test dataset malware balance
 print("Testing set counts:")
@@ -343,15 +388,19 @@ for m in models:
 
     plt.xlabel("False positive rate")
     plt.ylabel("True positive rate")
-    plt.title("Original vs. Simplified XGBoost\nROC curve comparison")
+    plt.title("Original vs. Simplified XGBoost (only reduced\nfeatures) ROC curve comparison")
     plt.legend(loc="best")
     plt.show()
 
-    _ = ax.set_title("Original vs. Simplified XGBoost\nROC curve comparison")
+    _ = ax.set_title("Original vs. Simplified XGBoost (only reduced\nfeatures) ROC curve comparison")
     ax.set_xlim(0, 0.2)
     ax.set_ylim(0.8, 1)
-    
-plt.savefig("graphs/roc_curve_comparison.png")
+
+if (malware_fraction == 'none') and (train_fraction == 1):
+    print("\n***\nAS YOU HAVE USED THE FULL DATASET WITH NO BALANCING, GRAPHS ARE SAVED IN FOLDER 'features_only_graphs'\n***\n")
+    plt.savefig("features_only_graphs/roc_curve_comparison.png")
+else:
+    plt.savefig("graphs/roc_curve_comparison.png")
 
 # Print confusion matrix
 print("Confusion Matrix")
@@ -362,7 +411,7 @@ disp = plot_confusion_matrix(
     display_labels=["Benign", "Malware"],
     cmap=plt.cm.get_cmap("hot"),
 )
-disp.ax_.set_title("Final XGBoost Confusion Matrix")
+disp.ax_.set_title("Final XGBoost (only reduced features)\nConfusion Matrix")
 print(disp.confusion_matrix)
 
 plt.figure()
@@ -370,13 +419,20 @@ plt.title('Final Simplified XGBoost Confusion Matrix, normalized')
 plt.xlabel('Predicted label')
 plt.ylabel('True label')
 group_names = ['True Neg', 'False Pos', 'False Neg', 'True Pos']
-group_counts = ["{0:0.1f}%".format(value) for value in 100*disp.confusion_matrix.flatten()/np.sum(disp.confusion_matrix)]
+ben_percs = ["{0:0.1f}% of Benignware".format(value) for value in 100*disp.confusion_matrix[0]/np.sum(disp.confusion_matrix[0])]
+mal_percs = ["{0:0.1f}% of Malware".format(value) for value in 100*disp.confusion_matrix[1]/np.sum(disp.confusion_matrix[1])]
+group_percs= ben_percs + mal_percs
 group_numbers = ["{0:0.0f}".format(value) for value in disp.confusion_matrix.flatten()] 
-labels = [f"{v1}\n{v2}\nTotal files: {v3}" for v1, v2, v3 in zip(group_names,group_counts,group_numbers)]
+labels = [f"{v1}\n{v2}\nTotal files: {v3}" for v1, v2, v3 in zip(group_names,group_percs,group_numbers)]
 labels = np.asarray(labels).reshape(2,2)
 sns.heatmap(disp.confusion_matrix, annot=labels, fmt='', cmap='hot')
 
-plt.savefig("graphs/confusion_matrix.png")
+if (malware_fraction == 'none') and (train_fraction == 1):
+    plt.savefig("features_only_graphs/confusion_matrix.png")
+else:
+    plt.savefig("graphs/confusion_matrix.png")
+
+plt.savefig("features_only_graphs/confusion_matrix.png")
 
 print("Learning curve")
 plot_learning_curve(clf, X_train, y_train)
