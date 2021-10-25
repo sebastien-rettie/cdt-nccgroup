@@ -21,6 +21,8 @@
 ##############################################################
 
 import warnings
+
+from numpy.core.numeric import NaN
 warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter(action='ignore', category=UserWarning)
 
@@ -33,6 +35,8 @@ import pandas as pd
 import pydot
 
 import xgboost as xgb
+
+import sklearn
 
 from sklearn.metrics import (
     accuracy_score,
@@ -52,7 +56,7 @@ from plotting import (
     plot_validation_curve,
 )
 from preprocessing import (
-    generate_types,
+    #generate_types,
     get_ct_feature_names,
     preprocess_dataframe,
     encode_scale,
@@ -64,6 +68,50 @@ from datetime import date
 import seaborn as sns
 
 ###########################################
+
+def generate_types(datafile):
+    col_names = pd.read_csv(datafile, nrows=0).columns
+    dtypes = {col: "str" for col in col_names}
+    string_columns = [
+        "SampleName",
+        "Name0",
+        "Name1",
+        "Name10",
+        "Name11",
+        "Name12",
+        "Name13",
+        "Name14",
+        "Name15",
+        "Name16",
+        "Name17",
+        "Name18",
+        "Name19",
+        "Name2",
+        "Name20",
+        "Name21",
+        "Name22",
+        "Name23",
+        "Name24",
+        "Name25",
+        "Name26",
+        "Name27",
+        "Name28",
+        "Name29",
+        "Name30",
+        "Name3",
+        "Name4",
+        "Name5",
+        "Name6",
+        "Name7",
+        "Name8",
+        "Name9",
+        "TimeDateStamp",
+        "e_res",
+        "e_res2",
+    ]
+    for column in string_columns:
+        dtypes.update({column: "object"})
+    return dtypes
 
 def balance_and_downsample(data, dataset_fraction, malware_balance):
     """
@@ -163,7 +211,7 @@ train_fraction = 0.2
 malware_fraction = 0.85
 
 #FOR USER DEFINED DATASET SHAPING
-user_inputs = True
+user_inputs = False
 
 if user_inputs:
     train_fraction = input('\n\nPlease select a fraction of the dataset you would like to use for training. For example, putting in 0.2 will use 20% of the available statistics: ')
@@ -235,6 +283,9 @@ df_test = pd.read_csv(
 df_test.set_index(["SampleName"], inplace=True)
 
 #Copy the dataframes for the 'old' XGBoost which is not trimmed
+#Replace nulls with None
+#df_train_old = df_train.where(pd.notnull(df_train), 0)
+#df_test_old = df_test.where(pd.notnull(df_test), 0)
 df_train_old = df_train
 df_test_old = df_test
 
@@ -367,34 +418,16 @@ for m in models:
     displays[m] = plot_roc_curve(clf, datasets[m][1], datasets[m][3], ax=ax, name=m)
     tn, fp, fn, tp = confusion_matrix(datasets[m][3], y_predicted, normalize="true").ravel()
 
-    """lw = 2
-    plt.scatter(
-        fp,
-        tp,
-        color="darkorange",
-        lw=lw,
-        label=m,
-)
-    plt.plot([0, 1], [0, 1], color="navy", lw=lw, linestyle="--", label="random guess")
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel("False Positives")
-    plt.ylabel("True Positives")
-    plt.title("Final XGBoost ROC Curve")
-    plt.legend(loc="lower right")
-
-    plt.savefig("graphs/roc_plot.png")
-    plt.show()"""
-
-    plt.xlabel("False positive rate")
-    plt.ylabel("True positive rate")
-    plt.title("Original vs. Simplified XGBoost (only reduced\nfeatures) ROC curve comparison")
-    plt.legend(loc="best")
-    plt.show()
+    ax.set_xlabel("False positive rate")
+    ax.set_ylabel("True positive rate")
+    ax.set_title("Original vs. Simplified XGBoost (only reduced\nfeatures) ROC curve comparison")
+    ax.legend(loc="best")
 
     _ = ax.set_title("Original vs. Simplified XGBoost (only reduced\nfeatures) ROC curve comparison")
     ax.set_xlim(0, 0.2)
     ax.set_ylim(0.8, 1)
+
+    print(m)
 
 if (malware_fraction == 'none') and (train_fraction == 1):
     print("\n***\nAS YOU HAVE USED THE FULL DATASET WITH NO BALANCING, GRAPHS ARE SAVED IN FOLDER 'features_only_graphs'\n***\n")
@@ -431,8 +464,6 @@ if (malware_fraction == 'none') and (train_fraction == 1):
     plt.savefig("features_only_graphs/confusion_matrix.png")
 else:
     plt.savefig("graphs/confusion_matrix.png")
-
-plt.savefig("features_only_graphs/confusion_matrix.png")
 
 print("Learning curve")
 plot_learning_curve(clf, X_train, y_train)

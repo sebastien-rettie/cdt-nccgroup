@@ -1,0 +1,169 @@
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
+warnings.simplefilter(action='ignore', category=UserWarning)
+
+import pickle
+
+import graphviz
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import pydot
+
+import xgboost as xgb
+
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score
+)
+
+from plotting import (
+    plot_learning_curve,
+    plot_validation_curve,
+)
+from preprocessing import (
+    generate_types,
+    get_ct_feature_names,
+    preprocess_dataframe,
+    encode_scale,
+)
+
+import time
+import sys
+
+###########################################
+
+def balance_dataset(data, target, fraction):
+    """
+    Samples the dataset of one type of program (malware/benign), while retaining 100% of the other, inputs
+
+    - data: Dataset to balance
+    - target: Benign or Malware ('benign' | 'malware')
+    - fraction: Fraction of target desired in the dataset balance
+
+    Returns 'data', balanced dataset
+    """
+
+    if target != 'malware' and target != 'benign':
+        raise ValueError('You have not selected a valid target for balancing. Please use either "malware" or "benign".')
+    
+    map = {
+        'benign': '0.0',
+        'malware': '1.0'
+    }
+
+    target_set = data[data["IsMalware"] == map[target]]
+    target_set = target_set.sample(frac = fraction)
+    other_target = [k for k in map if k != target][0]
+    other_set = data[data["IsMalware"] == map[other_target]]
+
+    data = pd.concat([target_set, other_set])
+
+    return data
+
+###########################################
+
+clf = xgb.XGBClassifier(
+        n_estimators=100,
+        colsample_bytree=0.8317,
+        learning_rate=0.3,
+        max_depth=11,
+        min_child_weight=3.0,
+        subsample=0.9099,
+        gamma=0.292,
+        reg_lambda=0.447,
+)
+
+full_train_size = 50456
+targets = ["benign", "malware"]
+balances = np.arange(0.1,1,0.05)
+
+train_file = "train.csv"
+df_train = pd.read_csv(
+    train_file,
+    dtype=generate_types(train_file),
+    engine="python",
+)
+df_train.set_index(["SampleName"], inplace=True)
+
+test_file = "test.csv"
+df_test = pd.read_csv(
+    test_file,
+    dtype=generate_types(test_file),
+    engine="python",
+)
+df_test.set_index(["SampleName"], inplace=True)
+
+df_results = np.zeros((len(targets)*5, len(balances)))
+index = 0
+
+while index < len(targets):
+    target = targets[index]
+    fraction_index = 0
+
+    while fraction_index < len(balances):
+        fraction = balances[fraction_index]
+
+        print("=====================================================\n")
+        print("Balancing the test set to {0:0.0f}% {1}...\n".format(100*fraction, target))
+        print("=====================================================")
+
+        train_balanced = balance_dataset(df_train, target, fraction)
+        print("\nCounts after balance:")
+        print(train_balanced["IsMalware"].value_counts())
+        print('This is {0:0.2f}% of the total data.\n'.format(100*np.shape(train_balanced)[0]/full_train_size))
+
+        y_train = train_balanced["IsMalware"]
+        X_train = train_balanced.drop("IsMalware", axis=1)
+
+        y_test = df_test["IsMalware"]
+        X_test = df_test.drop("IsMalware", axis=1)
+
+        # Import prefit encoder
+        with open("encoder.pickle", "rb") as f:
+            column_trans = pickle.load(f, encoding="bytes")
+            encoder = column_trans
+
+        X_train = encoder.transform(X_train)
+        X_test = encoder.transform(X_test)
+
+        # Selector
+        with open("selector.pickle", "rb") as f:
+            selector = pickle.load(f, encoding="bytes")
+
+        X_train = selector.transform(X_train)
+        X_test = selector.transform(X_test)
+
+        # Scaler
+        with open("scale.pickle", "rb") as f:
+            scale_transform = pickle.load(f, encoding="bytes")
+
+        X_train = scale_transform.transform(X_train)
+        X_test = scale_transform.transform(X_test)
+
+        clf.fit(X_train, y_train)
+        y_pred = clf.predict(X_test)
+
+        acc = accuracy_score(y_test, y_pred)
+        prec = precision_score(y_test, y_pred, pos_label='1.0')
+        rec = recall_score(y_test, y_pred, pos_label='1.0')
+        f1 = f1_score(y_test, y_pred, pos_label='1.0')
+
+        print('\nAccuracy: {0}'.format(acc))
+        print('Precision: {0}'.format(prec))
+        print('Recall: {0}'.format(rec))
+        print('f1: {0}\n'.format(f1))
+
+        df_results[5*index,fraction_index] = fraction
+        df_results[(5*index)+1,fraction_index] = acc
+        df_results[(5*index)+2,fraction_index] = prec
+        df_results[(5*index)+3,fraction_index] = rec
+        df_results[(5*index)+4,fraction_index] = f1
+
+        pd.DataFrame(df_results).to_csv('separate_balance_results.csv',header=None,index=None)
+
+        fraction_index += 1
+    
+    index += 1

@@ -21,7 +21,7 @@ from sklearn.metrics import confusion_matrix
 # Reduces overhead of pandas trying to decide for itself.
 def generate_types(datafile):
     col_names = pd.read_csv(datafile, nrows=0).columns
-    dtypes = {col: "string" for col in col_names}
+    dtypes = {col: "str" for col in col_names}
     string_columns = [
         "SampleName",
         "Name0",
